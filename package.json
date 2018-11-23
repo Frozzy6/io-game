@@ -1,0 +1,35 @@
+{
+  "name": "io-game",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "client": "webpack --watch",
+    "serve": "nodemon ./src/server/bin.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babel/runtime": "^7.1.5",
+    "express": "^4.16.4",
+    "http": "0.0.0",
+    "matter-js": "^0.14.2",
+    "morgan": "^1.9.1",
+    "poly-decomp": "^0.3.0",
+    "socket.io": "^2.1.1",
+    "uuid": "^3.3.2",
+    "ws": "^6.1.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.1.6",
+    "@babel/plugin-proposal-class-properties": "^7.1.0",
+    "@babel/plugin-proposal-export-default-from": "^7.0.0",
+    "@babel/plugin-transform-runtime": "^7.1.0",
+    "@babel/preset-env": "^7.1.6",
+    "@babel/register": "^7.0.0",
+    "babel-loader": "^8.0.4",
+    "chalk": "^2.4.1",
+    "webpack": "^4.25.1",
+    "webpack-cli": "^3.1.2"
+  }
+}
