@@ -1,0 +1,6 @@
+export default {
+    GET_WORLD_INFO: 'GET_WORLD_INFO',
+    ADD_ME: 'ADD_ME',
+    ADD_ME_SUCCESS: 'ADD_ME_SUCCESS',
+    UPDATE_ME: 'UPDATE_ME',
+};

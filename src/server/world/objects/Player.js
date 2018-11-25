@@ -14,6 +14,7 @@ class Player extends PhysicsObject {
     this.hp = 100;
     this.movementSpeed = 0.3;
     this.body.frictionAir = 0.3;
+    this.isAlive = true;
   }
 
   // getPublicData = () => ({

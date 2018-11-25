@@ -5,7 +5,7 @@ class Core {
     this.sm = socketManager;
     this.world = new World({
       sm: this.sm,
-      tickRate: 60,
+      tickRate: 30,
     });
 
     this.sm.setCallbacks({
@@ -31,7 +31,10 @@ class Core {
       this.world.addPlayer(socket);
     });
 
-    sm.on('UPDATE_ME', this.world.updatePlayer)
+    sm.on('UPDATE_ME', this.world.updatePlayer);
+    sm.on('WANT_TO_SHOT', (data, socket) => {
+      this.world.playerShoot(socket);
+    });
   }
 }
 

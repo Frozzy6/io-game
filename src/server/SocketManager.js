@@ -1,3 +1,4 @@
+import * as msgpack from 'notepack.io';
 import socketio from 'socket.io';
 
 class SocketManager {
@@ -45,10 +46,16 @@ class SocketManager {
   }
 
   broadcast(type, data) {
+    // this.sendEncoded(this.io, { type, data });
+    // console.log(msgpack.encode({ type, data }));
     this.io.emit('message', {
       type,
       data,
     });
+  }
+
+  sendEncoded(client, message) {
+    client.emit('message', msgpack.encode(message) || message, { binary: true });
   }
 
   onDissconnect = (socket) => {

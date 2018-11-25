@@ -1,4 +1,5 @@
 import DebugLabel from '../objects/DebugLabel';
+import Button from '../objects/Button';
 import Background from '../objects/Background';
 import Player from '../objects/Player';
 import ws from '../ws';
@@ -15,7 +16,7 @@ class GameScene extends Phaser.Scene {
     this.players = new Map();
     this.gameObjects = new Map();
     this.playersToDestroy = [];
-
+    this.lastUpdateTime = 0;
     ws.on('ADD_ME_SUCCESS', (playerData) => {
       this.createUser(playerData);
     });
@@ -75,7 +76,18 @@ class GameScene extends Phaser.Scene {
 
     ws.on('WORLD_UPDATE', this.updateWorldObjects);
     this.fpsCounter = new DebugLabel(this, 0, 0);
-    this.worldLabels = new DebugLabel(this, 0, 15);
+    // this.worldLabels = new DebugLabel(this, 0, 15);
+    this.stressButton = new Button({
+      scene: this,
+      x: 0,
+      y: 15,
+      text: 'stress',
+    });
+    this.stressButton.onClick(({ event }) => {
+      console.log('clicked')
+      ws.emit('STRESS_TEST');
+      event.preventDefault();
+    });
   }
 
   updateWorldObjects = (data) => {
@@ -105,21 +117,26 @@ class GameScene extends Phaser.Scene {
         gameObject.updateData(obj);
       }
     });
+
+    const stopDate = +(new Date());
+    // console.log('updates per sec', Math.floor(1000 / ( stopDate - this.lastUpdateTime)));
+    this.lastUpdateTime = stopDate;
   }
 
 
   update(time) {
     this.fpsCounter.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
-    this.worldLabels.setText([
-      'screen x: ' + Math.round(this.input.x),
-      'screen y: ' + Math.round(this.input.y),
-      'world x: ' + Math.round(this.input.mousePointer.worldX),
-      'world y: ' + Math.round(this.input.mousePointer.worldY)
-    ]);
+    // this.worldLabels.setText([
+    //   `network(s/r): ${ws.sendedPckgPerSec}/${ws.recievedPckgPerSec}`,
+    //   'screen x: ' + Math.round(this.input.x),
+    //   'screen y: ' + Math.round(this.input.y),
+    //   'world x: ' + Math.round(this.input.mousePointer.worldX),
+    //   'world y: ' + Math.round(this.input.mousePointer.worldY)
+    // ]);
 
     this.boundsGraphics.clear();
     this.boundsGraphics.strokeRectShape(this.boundsRect);
-    // this.graphics.fillRectShape(this.rect)
+
     if (this.player.isJoined) {
       this.player.update(time);
     }

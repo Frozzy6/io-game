@@ -1,13 +1,11 @@
 import path from 'path';
 import http from 'http';
-import WebSocket  from 'ws';
 import express from 'express';
 import morgan from 'morgan';
 import bodyParser from 'body-parser';
 
 import SocketManager from './SocketManager';
 import Core from './core';
-import World from './world/World';
 
 
 const app = express();

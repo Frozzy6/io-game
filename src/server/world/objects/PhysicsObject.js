@@ -19,9 +19,15 @@ class PhysicsObject {
   toMessage() {
     return {
       id: this.id,
-      position: this.body.position,
-      velocity: this.body.velocity,
-      angle: this.body.angle,
+      position: {
+        x: parseFloat(this.body.position.x.toFixed(1)),
+        y: parseFloat(this.body.position.y.toFixed(1)),
+      },
+      velocity: {
+        x: parseFloat(this.body.velocity.x.toFixed(1)),
+        y: parseFloat(this.body.velocity.y.toFixed(1)),
+      },
+      angle: parseFloat(this.body.angle.toFixed(2)),
       size: this.size,
     }
   }

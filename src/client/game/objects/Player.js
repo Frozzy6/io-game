@@ -9,7 +9,10 @@ class Player {
     this.lastUpdateMovement = -1;
     this.movementGap = 50;
     this.velocity = { x: 0, y: 0 };
-    // this.clock = new Phaser.Time.Clock(this.parent);
+
+    // Weapon
+    this.lastFireTime = 0;
+    this.fireGap = 300; 
     // this.bullets = [];
   }
 
@@ -190,7 +193,7 @@ class Player {
       keyA,
       keyD,
     } = this.controls;
-    // const { primaryDown: LBMouseDown } = this.parent.input.activePointer;
+    const { primaryDown: LBMouseDown } = this.parent.input.activePointer;
 
     
     if (time > this.lastUpdateMovement + this.movementGap) {
@@ -240,10 +243,16 @@ class Player {
 
     // // Fire system
     // if (LBMouseDown && this.weapon.delay.nextDelay < time - this.weapon.lastFired) {
-    //   this.createBullet(time);
-    //   this.weapon.lastFired = time;
-    //   this.weapon.delay.nextDelay = Math.floor(Math.random() * (this.weapon.delay.max - this.weapon.delay.min) + this.weapon.delay.min);
-    // }
+    if (LBMouseDown && time > this.lastFireTime + this.fireGap) {
+      console.log('shot');
+      ws.emit('WANT_TO_SHOT');
+      this.lastFireTime = time;
+      // this.createBullet(time);
+      // this.weapon.lastFired = time;
+      // this.weapon.delay.nextDelay = Math.floor(Math.random() * (this.weapon.delay.max - this.weapon.delay.min) + this.weapon.delay.min);
+    } else if (LBMouseDown) {
+      console.log(`Reason time ${time} last ${this.lastFireTime} last gap ${this.fireGap}`)
+    }
     
     // // Remove bullets 
     // for (var i = this.bullets.length - 1; i >= 0; i--) {

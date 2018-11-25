@@ -23,6 +23,7 @@ class World {
     this.players = new Map();
     this.worldState = {
       objects: [],
+      bullets: [],
     }
     
     this.generate();
@@ -43,6 +44,11 @@ class World {
     this.addGameObject(400, 400);
     this.addGameObject(450, 450);
     this.addGameObject(600, 400);
+    this.addGameObject(150, 150);
+    this.addGameObject(250, 250);
+    this.addGameObject(400, 400);
+    this.addGameObject(450, 450);
+
 
     this.topB = Matter.Bodies.rectangle(400, 0, 800, 10, { isStatic: true });
     this.bottomB = Matter.Bodies.rectangle(400, 600, 800, 10, { isStatic: true });
@@ -55,10 +61,9 @@ class World {
   addGameObject(x, y) {
     const box = Matter.Bodies.rectangle(x, y, 80, 80);
     box.slop = 0.01;
-    box.frictionAir = 0.3;
     Matter.World.add(this.physicsEngine.world, [box]);
     const phObj = new PhysicsObject({body: box, mass: 40});
-
+    
     this.worldState.objects.push(phObj);
   }
 
@@ -100,21 +105,20 @@ class World {
       force.y = y;
     }
 
-
-    // Matter.Body.setVelocity(player.body, force)
-    // player.body.setVelocity(x,y);
+    // Apply a force to change user position
     Matter.Body.applyForce(player.body, {
       x: player.body.position.x,
       y: player.body.position.y
     }, force);
-    // Matter.Body.applyForce(this.boxA, { x: this.boxA.position.x, y: this.boxA.position.y }, { x: 0.01, y: 0.01 });
-    // player.setPosition(position.x, position.y);
+
+    // That an angle from user to mouse cursor
     Matter.Body.setAngle(player.body, angle);
   }
 
   addPlayer = (socket) => {
     const { WORLD_WIDTH, WORLD_HEIGHT } = this;
     const { defaultPlayer } = this.config;
+
     // Generate random position on the world
     const x = Math.floor(Math.random() * WORLD_WIDTH) + 1;
     const y = Math.floor(Math.random() * WORLD_HEIGHT) + 1;
@@ -147,6 +151,29 @@ class World {
     this.players.delete(socket);
 
     this.sm.broadcast('USER_LEAVED', { id: player.id });
+  }
+
+  playerShoot = (socket) => {
+    const player = this.players.get(socket);
+    if (!player || !player.isAlive) {
+      console.log('player didnt finded')
+      return false;
+    }
+
+    const {
+      angle,
+      position: { x, y },
+    } = player.body;
+    const bVelocity = .2;
+    const bulletX = x + 50 * Math.cos(angle);
+    const bulletY = y + 50 * Math.sin(angle);;
+    const bullet = Matter.Bodies.rectangle(bulletX, bulletY, 50, 50);
+    bullet.angle = angle;
+    console.log(bullet.position)
+    Matter.World.add(this.physicsEngine.world, bullet);
+    // Matter.Body.setVelocity(bullet, bVelocity * Math.cos(angle), bVelocity * Math.sin(angle))
+    const phObj = new PhysicsObject({body: bullet, mass: 1});
+    this.worldState.bullets.push(phObj);
   }
 
   update(delta) {
@@ -189,7 +216,7 @@ class World {
       }
       return value;
     });
-    this.sm.broadcast('DEBUG', { bodies: JSON.parse(b), delta });
+    // this.sm.broadcast('DEBUG', { bodies: JSON.parse(b), delta });
   }
 }
 

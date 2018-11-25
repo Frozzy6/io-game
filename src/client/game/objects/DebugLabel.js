@@ -1,6 +1,6 @@
 class DebugLabel {
-  constructor(game, x, y, label = 'DebugLabel'){
-    this.game = game;
+  constructor(scene, x, y, label = 'DebugLabel'){
+    this.scene = scene;
     this.x = x;
     this.y = y;
     this.label = label;
@@ -9,11 +9,12 @@ class DebugLabel {
   }
 
   create(){
-    this.text = this.game.add
+    this.text = this.scene.add
       .text(this.x, this.y)
       .setText(this.label)
       .setScrollFactor(0)
       .setColor('white')
+      .setDepth(10)
       .setBackgroundColor('black');
   }
 
