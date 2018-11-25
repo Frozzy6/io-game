@@ -1,7 +1,7 @@
 import uuid from 'uuid';
 
 class PhysicsObject {
-  constructor({body, mass, size = 100, friction = 0.3}) {
+  constructor({body, mass, primitive, size = 100, friction = 0.3}) {
     this.id = uuid.v4();
     this.body = body;
     this.body.mass = mass;
@@ -9,7 +9,9 @@ class PhysicsObject {
     this.body.friction = friction;
     this.body.frictionStatic = friction;
     this.body.frictionAir = friction;
+    //TODO: remove and impliment later
     this.size = size;
+    this.primitive = primitive;
   }
 
   setBody(body) {

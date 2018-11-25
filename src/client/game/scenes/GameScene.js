@@ -1,5 +1,6 @@
 import DebugLabel from '../objects/DebugLabel';
 import Button from '../objects/Button';
+import ButtonGroup from '../objects/ButtonGroup';
 import Background from '../objects/Background';
 import Player from '../objects/Player';
 import ws from '../ws';
@@ -12,7 +13,6 @@ class GameScene extends Phaser.Scene {
       key: 'GameScene',
       active: false,
     });
-
     this.players = new Map();
     this.gameObjects = new Map();
     this.playersToDestroy = [];
@@ -25,8 +25,6 @@ class GameScene extends Phaser.Scene {
   createUser(playerData) {
     console.log(playerData);
     this.player.create(playerData);
-
-    // var pl = this.add.image(user.position.x, user.position.y, "round", frames[Math.floor(Math.random() * frames.length)]);
     this.cameras.main.startFollow(this.player.graphics);
   }
 
@@ -43,7 +41,7 @@ class GameScene extends Phaser.Scene {
   create(data) {
     ws.emit('ADD_ME');
     console.log('Game create called', data);
-
+    this.input.topOnly = true;
     this.boundsGraphics = this.add.graphics({ lineStyle: { width: 2, color: 0x0000aa }, fillStyle: { color: 0xaa0000 } });
     this.boundsRect = new Phaser.Geom.Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
@@ -76,24 +74,36 @@ class GameScene extends Phaser.Scene {
 
     ws.on('WORLD_UPDATE', this.updateWorldObjects);
     this.fpsCounter = new DebugLabel(this, 0, 0);
-    // this.worldLabels = new DebugLabel(this, 0, 15);
-    this.stressButton = new Button({
+    this.worldLabels = new DebugLabel(this, 0, 15);
+    this.btnGroup = new ButtonGroup({
       scene: this,
       x: 0,
-      y: 15,
-      text: 'stress',
+      y: 70,
+      title: 'controls',
     });
-    this.stressButton.onClick(({ event }) => {
-      console.log('clicked')
-      ws.emit('STRESS_TEST');
-      event.preventDefault();
+
+    this.btnGroup.addButton('add box', () => {
+      ws.emit('DEBUG_BOX_ADD');
+    });
+    this.btnGroup.addButton('add 10 boxes', () => {
+      for (let i = 0; i < 10; i++) {
+        ws.emit('DEBUG_BOX_ADD');
+      }
+    });
+    this.btnGroup.addButton('add 100 boxes', () => {
+      for (let i = 0; i < 100; i++) {
+        ws.emit('DEBUG_BOX_ADD');
+      }
+    });
+    this.btnGroup.addButton('drop friction/angular f', () => {
+      ws.emit('DEBUG_BOX_FORCE');
     });
   }
 
   updateWorldObjects = (data) => {
     const { gameObjects } = this;
     const { players } = data;
-    // console.log(data.players);
+
     /* update players */
     if (this.player.isJoined && players.length > 0) {
       players.map((playerData) => {
@@ -126,13 +136,14 @@ class GameScene extends Phaser.Scene {
 
   update(time) {
     this.fpsCounter.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
-    // this.worldLabels.setText([
-    //   `network(s/r): ${ws.sendedPckgPerSec}/${ws.recievedPckgPerSec}`,
-    //   'screen x: ' + Math.round(this.input.x),
-    //   'screen y: ' + Math.round(this.input.y),
-    //   'world x: ' + Math.round(this.input.mousePointer.worldX),
-    //   'world y: ' + Math.round(this.input.mousePointer.worldY)
-    // ]);
+    this.worldLabels.setText([
+      `network(s/r): ${ws.sendedPckgPerSec}/${ws.recievedPckgPerSec}`,
+      `objects: ${this.gameObjects.size + this.players.size}`,
+      'screen x: ' + Math.round(this.input.x),
+      'screen y: ' + Math.round(this.input.y),
+      'world x: ' + Math.round(this.input.mousePointer.worldX),
+      'world y: ' + Math.round(this.input.mousePointer.worldY),
+    ]);
 
     this.boundsGraphics.clear();
     this.boundsGraphics.strokeRectShape(this.boundsRect);

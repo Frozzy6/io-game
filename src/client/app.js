@@ -39,11 +39,16 @@ p.style.margin = "5px";
 p.style.position = "absolute";
 p.style.right = "0px";
 p.style.bottom = "0px";
+p.style.background = 'white';
+p.style.color = 'black';
+p.style.fontWeight = 'bold';
 document.getElementById('entry').append(p);
 
 
-ws.on('DEBUG', ({ bodies, delta }) => {
-  p.textContent = `loop per sec : ${Math.round(1000 / delta)}`;
+ws.on('DEBUG', ({ bodies, delta, world }) => {
+  canvas.width = world.WORLD_WIDTH;
+  canvas.height = world.WORLD_HEIGHT;
+  p.textContent = Math.round(1000 / delta);
   context.fillStyle = '#fff';
   context.fillRect(0, 0, canvas.width, canvas.height);
 

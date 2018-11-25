@@ -7,9 +7,9 @@ class World {
     this.sm = sm;
     this.tickRate = tickRate || 144;
     this.tickCounter = 0;
-
-    this.WORLD_WIDTH = 800;
-    this.WORLD_HEIGHT = 600;
+    this.updatesPerSec = 0;
+    this.WORLD_WIDTH = 1800;
+    this.WORLD_HEIGHT = 1600;
     this.config = {
       defaultPlayer: {
         size: 30,
@@ -34,35 +34,55 @@ class World {
       prevDate = Date.now();
       this.update(delta);
     }, 1000 / this.tickRate);
+
+    /* DEBUG ONLY MESSAGES */
+    this.sm.on('DEBUG_BOX_FORCE', () => {
+      this.worldState.objects.forEach(({ body }) => {
+        body.slop = 0.05;
+        body.friction = 0.0001;
+        body.frictionStatic = 0.0001;
+        body.frictionAir = 0.0001;
+        Matter.Body.setAngularVelocity(body, 1)
+      });
+    });
+
+    this.sm.on('DEBUG_BOX_ADD', () => {
+      const x = Math.round(Math.random() * this.WORLD_WIDTH);
+      const y = Math.round(Math.random() * this.WORLD_WIDTH);
+      this.addGameObject(x, y);
+    });
+
+    setInterval(() => {
+      console.log('ticks/sec: ', this.updatesPerSec, '[o]: ', this.worldState.objects.length);
+      this.updatesPerSec = 0;
+    }, 1000)
   }
 
   generate(){
-    this.addGameObject(10, 10);
+    const { 
+      WORLD_WIDTH,
+      WORLD_HEIGHT,
+    } = this;
+
     this.addGameObject(100, 100);
     this.addGameObject(150, 150);
     this.addGameObject(250, 250);
-    this.addGameObject(400, 400);
-    this.addGameObject(450, 450);
-    this.addGameObject(600, 400);
-    this.addGameObject(150, 150);
-    this.addGameObject(250, 250);
-    this.addGameObject(400, 400);
-    this.addGameObject(450, 450);
 
 
-    this.topB = Matter.Bodies.rectangle(400, 0, 800, 10, { isStatic: true });
-    this.bottomB = Matter.Bodies.rectangle(400, 600, 800, 10, { isStatic: true });
-    this.leftB = Matter.Bodies.rectangle(0, 300, 10, 600, { isStatic: true });
-    this.rightB = Matter.Bodies.rectangle(800, 300, 10, 600, { isStatic: true });
+    // Create edges of the world
+    const topB = Matter.Bodies.rectangle(WORLD_WIDTH / 2, 0, WORLD_WIDTH, 10, { isStatic: true });
+    const bottomB = Matter.Bodies.rectangle(WORLD_WIDTH / 2, WORLD_HEIGHT, WORLD_WIDTH, 10, { isStatic: true });
+    const leftB = Matter.Bodies.rectangle(0, WORLD_HEIGHT / 2, 10, WORLD_HEIGHT, { isStatic: true });
+    const rightB = Matter.Bodies.rectangle(WORLD_WIDTH, WORLD_WIDTH / 2, 10, WORLD_WIDTH, { isStatic: true });
 
-    Matter.World.add(this.physicsEngine.world, [this.topB, this.leftB, this.rightB, this.bottomB]);
+    Matter.World.add(this.physicsEngine.world, [topB, leftB, rightB, bottomB]);
   }
 
   addGameObject(x, y) {
     const box = Matter.Bodies.rectangle(x, y, 80, 80);
     box.slop = 0.01;
     Matter.World.add(this.physicsEngine.world, [box]);
-    const phObj = new PhysicsObject({body: box, mass: 40});
+    const phObj = new PhysicsObject({body: box, mass: 40, primitive: 'rect'});
     
     this.worldState.objects.push(phObj);
   }
@@ -177,6 +197,7 @@ class World {
   }
 
   update(delta) {
+    this.updatesPerSec++;
     this.tickCounter++;
     Matter.Events.trigger(this.physicsEngine, 'tick', { timestamp: this.physicsEngine.timing.timestamp });
     Matter.Engine.update(this.physicsEngine, 1000 / 60);
@@ -216,7 +237,14 @@ class World {
       }
       return value;
     });
-    // this.sm.broadcast('DEBUG', { bodies: JSON.parse(b), delta });
+    this.sm.broadcast('DEBUG', {
+      world: {
+        WORLD_WIDTH: this.WORLD_WIDTH, 
+        WORLD_HEIGHT: this.WORLD_HEIGHT,
+      },
+      bodies: JSON.parse(b), 
+      delta 
+    });
   }
 }
 

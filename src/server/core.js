@@ -5,7 +5,7 @@ class Core {
     this.sm = socketManager;
     this.world = new World({
       sm: this.sm,
-      tickRate: 30,
+      tickRate: 60,
     });
 
     this.sm.setCallbacks({

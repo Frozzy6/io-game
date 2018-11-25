@@ -1,37 +1,60 @@
+import { defaults } from 'lodash';
+
 import AbstractComopnent from './AbstractComponent';
 
-const defaults = {
+const defaultParams = {
   color: 'white',
   bgColor: 'black',
-  hoverColor: '#efefef'
+  x: 0,
+  y: 0,
+  onClick: () => { 
+    console.log('forgot set onClick prop to Button');
+  }
 }
 
 class Button extends AbstractComopnent {
   constructor(props) {
+    const {
+      x,
+      y,
+      text,
+      color,
+      bgColor,
+      onClick,
+    } = defaults(props, defaultParams);
     super(props);
+
     this.text = this.scene.add
-      .text(props.x, props.y)
-      .setText(props.text)
-      .setColor(props.color || defaults.color)
-      .setBackgroundColor(props.bgColor || defaults.bgColor)
+      .text(x, y)
+      .setText(text)
+      .setColor(color)
+      .setBackgroundColor(bgColor)
       .setScrollFactor(0)
-      .setInteractive()
+      .setDepth(10)
+      .setInteractive();
 
     this.text.on('pointerover', () => {
-      console.log('over')
-      this.text.setColor('black')
-      this.text.setBackgroundColor(props.hoverColor || defaults.hoverColor)
+      this.text.setColor(bgColor);
+      this.text.setBackgroundColor(color);
     });
 
     this.text.on('pointerout', () => {
-      console.log('out')
-      this.text.setColor('white')
-      this.text.setBackgroundColor(props.bgColor || defaults.bgColor)
+      this.text.setColor(color);
+      this.text.setBackgroundColor(bgColor);
     });
+
+    if (onClick) {
+      this.onClick(onClick);
+    }
   }
 
   onClick(cb) {
-    this.text.on('pointerdown', cb);
+    this.text.on('pointerdown', function() {
+      /* Call callback and prevent another events */
+      const { stopPropagation } = arguments[3];
+      cb(...arguments);
+      stopPropagation();
+    });
   }
 } 
 
