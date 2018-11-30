@@ -12,18 +12,14 @@ class Player {
 
     // Weapon
     this.lastFireTime = 0;
-    this.fireGap = 300; 
-    // this.bullets = [];
+    this.fireGap = 50; 
   }
 
-  preload() {
-    const parent = this.parent;
-    parent.load.image('bullet', '/img/bullets/bullet6.png');
-    // particles 
-    parent.load.image('whiteSmoke', '/img/particles/white-smoke.png');
-    parent.load.image('flares', '/img/particles/yellow.png');
-    parent.load.spritesheet('player', '/img/game/user/player.png', {frameWidth: 262, frameHeight: 157});
-    parent.load.spritesheet('player_move', '/img/game/user/player_move.png', { frameWidth: 259, frameHeight: 180 });
+  static preload(scene) {
+    scene.load.image('whiteSmoke', '/img/particles/white-smoke.png');
+    scene.load.atlas('flares', '/img/bullets/flares.png', '/img/bullets/flares.json');
+    scene.load.spritesheet('player', '/img/game/user/player.png', {frameWidth: 262, frameHeight: 157});
+    scene.load.spritesheet('player_move', '/img/game/user/player_move.png', { frameWidth: 259, frameHeight: 180 });
   }
 
   create(data) {
@@ -34,7 +30,6 @@ class Player {
     this.angle = data.angle;
     this.size = data.size;
     this.speed = 5;
-
     this.graphics = this.parent.add.container(this.position.x, this.position.y);
     this.graphics.setDepth(3);
     this.debugGraphics = this.parent.add.graphics({ lineStyle: { width: 2, color: 0xbbbb00 }, fillStyle: { color: 0xbbbb00 } });;
@@ -54,7 +49,7 @@ class Player {
       frameRate: 11
     });
 
-    this.instance = this.parent.add.sprite(0, 0, 'player').play('idle');
+    this.instance = this.parent.add.sprite(0, 0, 'player').play('move');
     this.instance.setDisplaySize(this.size * 3.8, this.instance.height / this.instance.width * this.size * 3.8);
     this.instance.setOrigin(0.25,0.5);
     //dummy weapon
@@ -183,7 +178,6 @@ class Player {
   updateOther() {
     if (this.graphics.rotation !== this.angle) {
       this.graphics.rotation = Phaser.Math.Angle.RotateTo(this.graphics.rotation, this.angle, 0.2)
-      console.log(this.graphics.rotation, this.angle);
     }
     this.graphics.setPosition(this.position.x, this.position.y);
   }
@@ -195,7 +189,7 @@ class Player {
     const { worldX, worldY, x: mouseX, y: mouseY } = this.parent.game.input.mousePointer;
     const { scrollX: camScrollX, scrollY: camScrollY } = this.parent.cameras.main;
   
-    // // Keys state 
+    // Keys state 
     const {
       keyW,
       keyS,
@@ -227,23 +221,22 @@ class Player {
       });
     }
 
-    if (lbMouseDown && time > this.lastFireTime + this.fireGap) {
-      console.log('shooot?')
-      ws.emit('WANT_TO_SHOT');
-      this.lastFireTime = time;
-      // this.createBullet(time);
-      this.weapon.lastFired = time;
-      // this.weapon.delay.nextDelay = Math.floor(Math.random() * (this.weapon.delay.max - this.weapon.delay.min) + this.weapon.delay.min);
-    }
-
     this.graphics.x = this.position.x;
     this.graphics.y = this.position.y;
 
-    this.nextAngle = getAngleBetween(this.position.x, this.position.y, mouseX + camScrollX, mouseY + camScrollY) - 0.05;
-    
+    this.nextAngle = getAngleBetween(this.position.x, this.position.y, mouseX + camScrollX, mouseY + camScrollY);
+
     if (this.nextAngle !== this.angle) {
-      this.graphics.rotation = Phaser.Math.Angle.RotateTo(this.graphics.rotation, this.nextAngle, 0.2)
+      this.graphics.rotation = Phaser.Math.Angle.RotateTo(this.graphics.rotation, this.nextAngle, 0.3)
     }
+
+    if (lbMouseDown && time > this.lastFireTime + this.fireGap) {
+      ws.emit('WANT_TO_SHOT_RAY');
+      this.lastFireTime = time;
+      this.weapon.lastFired = time;
+    }
+
+
 
     if (Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1) {
       this.instance.play('move', true);
@@ -276,7 +269,7 @@ class Player {
     //   }
     // }
 
-    // this.flares.setPosition(this.player.x, this.player.y);
+    // this.flares.setPosition(this.position.x, this.position.y);
     // this.flares.setSpeed(500)
     // this.flares.emitParticle(1);
 

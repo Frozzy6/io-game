@@ -1,6 +1,13 @@
-import Matter from 'matter-js/src/module/main.js';
-import PhysicsObject from './objects/PhysicsObject';
-import Player from "./objects/Player";
+import Matter, { 
+  Events,
+  Engine,
+  Query,
+  Composite,
+} from 'matter-js/src/module/main.js';
+import uuid from 'uuid';
+import Box from './objects/Box';
+import Player from './objects/Player';
+import Bullet from './objects/Bullet';
 
 class World {
   constructor({ sm, tickRate }) {
@@ -8,13 +15,8 @@ class World {
     this.tickRate = tickRate || 144;
     this.tickCounter = 0;
     this.updatesPerSec = 0;
-    this.WORLD_WIDTH = 1800;
-    this.WORLD_HEIGHT = 1600;
-    this.config = {
-      defaultPlayer: {
-        size: 30,
-      },
-    }
+    this.WORLD_WIDTH = 1200;
+    this.WORLD_HEIGHT = 800;
 
     this.physicsEngine = Matter.Engine.create({ enableSleeping: false });
     this.physicsEngine.world.gravity.x = 0;
@@ -24,6 +26,7 @@ class World {
     this.worldState = {
       objects: [],
       bullets: [],
+      rayBullets: new Map(),
     }
     
     this.generate();
@@ -36,6 +39,10 @@ class World {
     }, 1000 / this.tickRate);
 
     /* DEBUG ONLY MESSAGES */
+    setInterval(() => {
+      this.sendDebugMessage();
+    }, 200);
+
     this.sm.on('DEBUG_BOX_FORCE', () => {
       this.worldState.objects.forEach(({ body }) => {
         body.slop = 0.05;
@@ -48,7 +55,7 @@ class World {
 
     this.sm.on('DEBUG_BOX_ADD', () => {
       const x = Math.round(Math.random() * this.WORLD_WIDTH);
-      const y = Math.round(Math.random() * this.WORLD_WIDTH);
+      const y = Math.round(Math.random() * this.WORLD_HEIGHT);
       this.addGameObject(x, y);
     });
 
@@ -67,6 +74,8 @@ class World {
     this.addGameObject(100, 100);
     this.addGameObject(150, 150);
     this.addGameObject(250, 250);
+    this.addGameObject(350, 350);
+    this.addGameObject(450, 450);
 
 
     // Create edges of the world
@@ -79,12 +88,9 @@ class World {
   }
 
   addGameObject(x, y) {
-    const box = Matter.Bodies.rectangle(x, y, 80, 80);
-    box.slop = 0.01;
-    Matter.World.add(this.physicsEngine.world, [box]);
-    const phObj = new PhysicsObject({body: box, mass: 40, primitive: 'rect'});
-    
-    this.worldState.objects.push(phObj);
+    const box = new Box({x, y});
+    box.appendTo(this.physicsEngine.world);
+    this.worldState.objects.push(box);
   }
 
   collectWorldInfo() {
@@ -137,24 +143,18 @@ class World {
 
   addPlayer = (socket) => {
     const { WORLD_WIDTH, WORLD_HEIGHT } = this;
-    const { defaultPlayer } = this.config;
 
     // Generate random position on the world
     const x = Math.floor(Math.random() * WORLD_WIDTH) + 1;
     const y = Math.floor(Math.random() * WORLD_HEIGHT) + 1;
 
-    const player = new Player(socket, { x, y }, defaultPlayer.size);
+    const player = new Player(socket, { x, y });
     Matter.World.addBody(this.physicsEngine.world, player.body);
     this.players.set(socket, player);
 
-    socket.emit('message', {
+    this.sm.sendTo(socket, {
       type: 'ADD_ME_SUCCESS',
-      data: player.toMessagePrivate(),
-    });
-
-    socket.broadcast.emit('message', {
-      type: 'USER_JOINED',
-      data: player.toMessage(),
+      data: player.toPersonalMessage(),
     });
 
     return player;
@@ -184,24 +184,53 @@ class World {
       angle,
       position: { x, y },
     } = player.body;
-    const bVelocity = .2;
-    const bulletX = x + 50 * Math.cos(angle);
-    const bulletY = y + 50 * Math.sin(angle);;
-    const bullet = Matter.Bodies.rectangle(bulletX, bulletY, 50, 50);
-    bullet.angle = angle;
-    console.log(bullet.position)
-    Matter.World.add(this.physicsEngine.world, bullet);
-    // Matter.Body.setVelocity(bullet, bVelocity * Math.cos(angle), bVelocity * Math.sin(angle))
-    const phObj = new PhysicsObject({body: bullet, mass: 1});
-    this.worldState.bullets.push(phObj);
+
+    const bullet = new Bullet({
+      playerX: x,
+      playerY: y,
+      playerAngle: angle,
+      world: this.physicsEngine.world,
+    });
+
+    this.worldState.bullets.push(bullet);
+  }
+
+  playerShootRay = (socket) => {
+    const player = this.players.get(socket);
+    const { rayBullets } = this.worldState;
+    const { 
+      angle,
+      position: {
+        x, 
+        y
+      } 
+    } = player.body;
+    const length = 50;
+    
+    const id = uuid.v4();
+    rayBullets.set(id, {
+      id,
+      own: player.id,
+      angle,
+      from: {
+        x: x + 70 * Math.cos(angle),
+        y: y + 70 * Math.sin(angle),
+      },
+      to: {
+        x: x + (70 + length) * Math.cos(angle),
+        y: y + (70 + length) * Math.sin(angle),
+      },
+    });
   }
 
   update(delta) {
+    const { physicsEngine } = this;
+
     this.updatesPerSec++;
     this.tickCounter++;
-    Matter.Events.trigger(this.physicsEngine, 'tick', { timestamp: this.physicsEngine.timing.timestamp });
-    Matter.Engine.update(this.physicsEngine, 1000 / 60);
-    Matter.Events.trigger(this.physicsEngine, 'afterTick', { timestamp: this.physicsEngine.timing.timestamp });
+    Events.trigger(physicsEngine, 'tick', { timestamp: physicsEngine.timing.timestamp });
+    Engine.update(physicsEngine, 1000 / 60);
+    Events.trigger(physicsEngine, 'afterTick', { timestamp: physicsEngine.timing.timestamp });
 
     const players = [];
     const playersIter = this.players.entries();
@@ -209,16 +238,98 @@ class World {
       players.push(p.toMessage());
     }
 
-    this.sm.broadcast('WORLD_UPDATE', {
-      players,
-      objects: this.worldState.objects.map(o => o.toMessage()),
+    const bodies = Composite.allBodies(physicsEngine.world);
+
+    const { rayBullets } = this.worldState;
+
+    rayBullets.forEach((ray) => {
+      const rayWidth = 1;
+      if (ray.stop) {
+        return;
+      }
+      /*
+        Query ray create new rectangle object with from between points
+        with "rayWidth" width and check collisions between new rect and objects
+       */
+      const collisions = Query.ray(bodies, ray.from, ray.to);
+
+      if (collisions.length > 0) {
+        const fcol = collisions[0];
+        // ray.move = fcol.normal;
+        ray.stop = true;
+        for (let i = 0; i <= 2; i++ ) {
+          const stepX = (ray.to.x - ray.from.x) / 2 * i;
+          const stepY = (ray.to.y - ray.from.y) / 2 * i;
+          var r = Query.point([fcol.body], {
+            x: ray.from.x + stepX,
+            y: ray.from.y + stepY,
+          });
+          // console.log(r);
+          if (r.length > 0) {
+            ray.point = {
+              x: ray.from.x + stepX,
+              y: ray.from.y + stepY,
+            }
+            ray.position = ray.point;
+            break;
+          }
+        }
+
+        if (!ray.point) {
+          ray.point = {
+            x: ray.from.x + (ray.to.x - ray.from.x) / 2,
+            y: ray.from.y + (ray.to.y - ray.from.y) / 2,
+          }
+          ray.position = ray.point;
+        }
+        const v = Matter.Vector.normalise({
+          x: ray.to.x - ray.from.x,
+          y: ray.to.y - ray.from.y,
+        });
+        console.log(v);
+        Matter.Body.applyForce(collisions[0].body, {
+            x: ray.point.x,
+            y: ray.point.y,
+          }, {
+            x: v.x * 0.1,
+            y: v.y * 0.1,
+          });
+
+      }
     });
-    this.sendDebugMessage(delta);
+
+    rayBullets.forEach((ray) => {
+      if (ray.stop) {
+        return;
+      }
+      const { from, to } = ray;
+      const delta = Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2);
+      ray.from.x += delta * Math.cos(ray.angle);
+      ray.from.y += delta * Math.sin(ray.angle);
+      ray.to.x += delta * Math.cos(ray.angle);
+      ray.to.y += delta * Math.sin(ray.angle);
+      ray.position = {
+        x: ray.from.x + (ray.to.x - ray.from.x) / 2,
+        y: ray.from.y + (ray.to.y - ray.from.y) / 2,
+      }
+    });
+
+    this.sm.broadcast('WORLD_UPDATE', {
+      /* Players state */
+      players,
+      /* Game Object */
+      objects: this.worldState.objects.map(o => o.toMessage()),
+      newObjects: [],
+      /* Bullets */
+      bullets: this.worldState.bullets.map(o => o.toMessage()),
+      newBullets: [],
+      rayBullets: Array.from(rayBullets).reduce((acc, item) => (acc.push(item[1]), acc), []),
+    });
   }
 
   sendDebugMessage(delta) {
     /* forming debug data */
-    var bodies = Matter.Composite.allBodies(this.physicsEngine.world);
+    var bodies = Composite.allBodies(this.physicsEngine.world);
     var cache = [];
     const b = JSON.stringify(bodies, function (key, value) {
       if (typeof value === 'object' && value !== null) {
@@ -243,7 +354,6 @@ class World {
         WORLD_HEIGHT: this.WORLD_HEIGHT,
       },
       bodies: JSON.parse(b), 
-      delta 
     });
   }
 }

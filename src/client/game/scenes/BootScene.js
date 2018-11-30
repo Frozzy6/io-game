@@ -5,14 +5,9 @@ class BootScene extends Phaser.Scene {
     super({ key: 'BootScene' });
   }
 
-  preload() {
-    // const { 
-    //   centerX,
-    //   centerY
-    // } = this.physics.world.bounds;
-    
-    this.text = this.add.text(10, 10, 'loading', { font: '16px Arial', fill: '#dddddd', align: 'center' })
-    this.text.setOrigin(0.5, 0.5);
+  preload() {  
+    this.text = this.add.text(10, 10, 'Loading', { font: '16px Arial', fill: '#dddddd', align: 'center' })
+    this.text.setOrigin(0.0, 0.5);
     this.dotsCount = 0;
     this.lastChange = 0;
   }
@@ -29,7 +24,7 @@ class BootScene extends Phaser.Scene {
 
   update(time, delta) {
     if (time > this.lastChange) {
-      this.text.setText('loading' + '.'.repeat(this.dotsCount));
+      this.text.setText('Loading' + '.'.repeat(this.dotsCount));
       this.dotsCount += 1;
       this.lastChange = time + 150;
       if ( this.dotsCount > 6) {

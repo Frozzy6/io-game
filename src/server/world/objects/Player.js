@@ -1,9 +1,8 @@
-import uuid from 'uuid';
 import Matter from 'matter-js/src/module/main.js';
 import PhysicsObject from './PhysicsObject';
 
 class Player extends PhysicsObject {
-  constructor(socket, pos, size) {
+  constructor(socket, pos, size = 30) {
     super({
       body: Matter.Bodies.circle(pos.x, pos.y, size),
       size,
@@ -14,18 +13,18 @@ class Player extends PhysicsObject {
     this.hp = 100;
     this.movementSpeed = 0.3;
     this.body.frictionAir = 0.3;
+    this.size = size;
     this.isAlive = true;
   }
 
-  // getPublicData = () => ({
-  //   id: this.id,
-  //   hp: this.hp,
-  //   angle: this.angle,
-  //   position: this.position,
-  //   velocity: this.velocity,
-  // })
+  toMessage() {
+    return {
+      ...super.toMessage(),
+      size: this.size,
+    }
+  }
 
-  toMessagePrivate = () => ({
+  toPersonalMessage = () => ({
     ...this.toMessage(),
     private: true
   })

@@ -8,4 +8,9 @@ export const Messages = {
 export const Primitives = {
   RECT: 'rect',
   CIRCLE: 'circle',
-}
+};
+
+export const Textures = {
+  BOX: 'box',
+  BULLET: 'bullet',
+};

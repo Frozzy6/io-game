@@ -9,22 +9,29 @@ class WS {
     this.sendedCount = 0;
     this.recievedCount = 0;
     
-    this.socket = io.connect('ws://localhost:3000/', {
-      transports: ['websocket']
-    });
+    this.socket = new WebSocket('ws://localhost:3000/');
+    this.socket.binaryType = 'arraybuffer';
 
-    this.socket.on('reconnect_attempt', (err) => {
-      console.log(err);
-    })
+    this.listeners = [];
+    // this.socket.on('reconnect_attempt', (err) => {
+    //   console.log(err);
+    // })
 
-    this.socket.on('connect', () => {
+    this.socket.onopen = () => {
       this.isReady = true;
-    });
+    };
 
     // debug counter
-    this.socket.on('message', (msg) => {
+    this.socket.onmessage = (event) => {
       this.recievedCount++;
-    });
+      const msg = msgpack.decode(new Uint8Array(event.data));
+      console.log('decoded', msg);
+      this.listeners.forEach(({messageType, callback}) => {
+        if (msg.type === messageType) {
+          callback(msg.data);
+        }
+      })
+    };
 
     setInterval(()=>{
       this.sendedPckgPerSec = this.sendedCount;
@@ -36,18 +43,25 @@ class WS {
 
   emit(type, data) {
     this.sendedCount++;
-    this.socket.emit('message', { type, data });
+    this.socket.send(msgpack.encode({
+      type,
+      data
+    }))
   }
 
   on(messageType, callback) {
-    this.socket.on('message', (msg) => {
-      // console.log('raw', rawMsg);
-      // const msg = msgpack.decode(Buffer.from(rawMsg));
-      // console.log('decoded', msg);
-      if (msg.type === messageType) {
-        callback(msg.data);
-      }
+    this.listeners.push({
+      messageType,
+      callback
     });
+    // this.socket.onmessage = (event) => {
+    //   const msg = msgpack.decode(new Uint8Array(event.data));
+    //   console.log('decoded', msg);
+    //   console.log(msg.type)
+    //   if (msg.type === messageType) {
+    //     callback(msg.data);
+    //   }
+    // };
   }
 }
 

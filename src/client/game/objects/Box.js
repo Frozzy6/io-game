@@ -4,8 +4,8 @@ class Box {
     this.size = 80;
   }
 
-  preload() {
-    const { parent } = this;
+  static preload(scene) {
+    scene.load.image('woodenBox', '/img/game/box.png');
   }
 
   create(data) {

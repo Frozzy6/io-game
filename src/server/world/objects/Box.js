@@ -1,21 +1,28 @@
+import Matter from 'matter-js/src/module/main.js';
 import { defaults } from 'lodash';
 
 import PhysicsObject from './PhysicsObject';
-import { Primitives } from '../../../common/dictionary';
+import { Primitives, Textures } from '../../../common/dictionary';
 
 const defaultParams = {
-  width: 80,
-  height: 80,
+  radius: 10,
   x: 0,
   y: 0,
+  width: 80,
+  height: 80,
+  mass: 40,
   primitive: Primitives.RECT,
-  texture: 'box',
+  texture: Textures.BOX,
+  size: 80,
 }
 
 class Box extends PhysicsObject {
   constructor(props) {
-    this.options = defaults(props, defaultParams);
-    super(this.options);
+    const options = defaults(props, defaultParams);
+    const body = Matter.Bodies.rectangle(options.x, options.y, 80, 80);
+    super({ ...options, body });
+    this.options = options;
+    this.body.slop = 0.01;
   }
 
   toMessage() {

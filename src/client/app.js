@@ -18,8 +18,8 @@ window.addEventListener('contextmenu', function (e) {
   e.preventDefault();
 }, false);
 
-var canvas = document.createElement('canvas'),
-  context = canvas.getContext('2d');
+const canvas = document.createElement('canvas');
+const context = canvas.getContext('2d');
 
 
 canvas.width = 1000;
@@ -45,14 +45,17 @@ p.style.fontWeight = 'bold';
 document.getElementById('entry').append(p);
 
 
-ws.on('DEBUG', ({ bodies, delta, world }) => {
+ws.on('DEBUG', ({ bodies, world }) => {
   canvas.width = world.WORLD_WIDTH;
   canvas.height = world.WORLD_HEIGHT;
-  p.textContent = Math.round(1000 / delta);
+  p.textContent = '?';
   context.fillStyle = '#fff';
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   for (var i = 0; i < bodies.length; i += 1) {
+    if (!bodies[i]) {
+      continue;
+    }
     context.fillStyle = bodies[i].render.fillStyle;
     context.beginPath();
     var vertices = bodies[i].vertices;

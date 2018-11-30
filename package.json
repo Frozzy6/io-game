@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "client": "webpack --watch",
-    "serve": "nodemon ./src/server/bin.js"
+    "serve": "nodemon ./src/server/bin.js",
+    "serve:debug": "nodemon --inspect ./src/server/bin.js"
   },
   "author": "",
   "license": "ISC",
@@ -16,11 +17,11 @@
     "lodash": "^4.17.11",
     "matter-js": "^0.14.2",
     "morgan": "^1.9.1",
+    "notepack": "0.0.2",
     "notepack.io": "^2.1.3",
     "poly-decomp": "^0.3.0",
-    "socket.io": "^2.1.1",
     "uuid": "^3.3.2",
-    "ws": "^6.1.0"
+    "ws": "^6.1.2"
   },
   "devDependencies": {
     "@babel/core": "^7.1.6",

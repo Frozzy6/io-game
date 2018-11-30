@@ -1,12 +1,11 @@
-import * as msgpack from 'notepack.io';
-import socketio from 'socket.io';
+import * as msgpack from 'notepack';
+import * as WebSocket from 'ws';
+import { throws } from 'assert';
 
 class SocketManager {
-  constructor(http){
-    this.io = socketio(http);
-    // this.io.set('transports', ['ws']);
-    this.io.on('connection', this.onConnection);
-
+  constructor(server){
+    this.wss = new WebSocket.Server({ server })
+    this.wss.on('connection', this.onConnection);
     this.sockets = [];
     this.listeners = [];
   }
@@ -20,8 +19,10 @@ class SocketManager {
     console.log('socket connected');
     this.connect && this.connect(socket);
     this.sockets.push(socket);
-    socket.on('disconnect', this.onDissconnect.bind(null, socket));
-    socket.on('message', (msg) => {
+
+    socket.on('close', this.onDissconnect.bind(null, socket));
+    socket.on('message', (byteArray) => {
+      const msg = msgpack.decode(Buffer.from(byteArray));
       const type = msg.type;
       this.listeners.forEach((item) => {
         if (item.type === type) {
@@ -39,23 +40,23 @@ class SocketManager {
     this.listeners = this.listeners.filter(item => item.callback !== callback);
   }
 
-  each(fn) {
-    for (let i = 0; i < this.sockets.length; ++i) {
-      fn(this.sockets[i]);
-    }
+  sendTo(socket, msg) {
+    socket.send(msgpack.encode(msg));
   }
 
   broadcast(type, data) {
-    // this.sendEncoded(this.io, { type, data });
-    // console.log(msgpack.encode({ type, data }));
-    this.io.emit('message', {
-      type,
-      data,
+    this.wss.clients.forEach((client)=> {
+      if (client !== this.wss && client.readyState === WebSocket.OPEN) {
+        if (type instanceof Function === true) {
+          type(client)
+        } else {
+          client.send(msgpack.encode({
+            type,
+            data
+          }));
+        }
+      }
     });
-  }
-
-  sendEncoded(client, message) {
-    client.emit('message', msgpack.encode(message) || message, { binary: true });
   }
 
   onDissconnect = (socket) => {

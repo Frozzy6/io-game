@@ -1,10 +1,12 @@
-import DebugLabel from '../objects/DebugLabel';
-import Button from '../objects/Button';
-import ButtonGroup from '../objects/ButtonGroup';
+import DebugLabel from '../ui/DebugLabel';
+import ButtonGroup from '../ui/ButtonGroup';
 import Background from '../objects/Background';
 import Player from '../objects/Player';
 import ws from '../ws';
 import Box from '../objects/Box';
+import Bullet from '../objects/Bullet';
+import Line from '../objects/Line';
+
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -13,43 +15,35 @@ class GameScene extends Phaser.Scene {
       key: 'GameScene',
       active: false,
     });
-    this.players = new Map();
-    this.gameObjects = new Map();
-    this.playersToDestroy = [];
-    this.lastUpdateTime = 0;
-    ws.on('ADD_ME_SUCCESS', (playerData) => {
-      this.createUser(playerData);
-    });
-  }
 
-  createUser(playerData) {
-    console.log(playerData);
-    this.player.create(playerData);
-    this.cameras.main.startFollow(this.player.graphics);
+    this.players = new Map();
+    this.bullets = new Map();
+    this.gameObjects = new Map(); 
   }
 
   preload() {
     console.log('Game preload called');
-    this.load.image('woodenBox', '/img/game/box.png');
-    this.background = new Background(this);
-    this.background.preload();
+    Background.preload(this);
+    Player.preload(this);
+    Box.preload(this);
+    Bullet.preload(this);
+  }
 
+  createUser(playerData) {
     this.player = new Player(this);
-    this.player.preload();
+    this.player.create(playerData);
+    this.cameras.main.startFollow(this.player.graphics);
   }
 
   create(data) {
-    ws.emit('ADD_ME');
     console.log('Game create called', data);
+    /* When set to true this Input Plugin will emulate DOM behavior by only emitting events from the top-most Game Objects in the Display List.*/
     this.input.topOnly = true;
-    this.boundsGraphics = this.add.graphics({ lineStyle: { width: 2, color: 0x0000aa }, fillStyle: { color: 0xaa0000 } });
-    this.boundsRect = new Phaser.Geom.Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    const { WORLD_WIDTH, WORLD_HEIGHT, user, players } = data;
+    const { WORLD_WIDTH, WORLD_HEIGHT, players } = data;
     this.cameras.main.setBounds(-100, -100, WORLD_WIDTH + 200, WORLD_HEIGHT + 200);
-    this.cursors = this.input.keyboard.createCursorKeys();
     this.cameras.main.setZoom(1);
-    this.background.create(WORLD_WIDTH, WORLD_HEIGHT);
+    this.background = new Background({ scene: this, width: WORLD_WIDTH, height: WORLD_HEIGHT});
 
     /* Process players that already in the game */
     players.forEach((playerData) => {
@@ -58,21 +52,7 @@ class GameScene extends Phaser.Scene {
       this.players.set(playerData.id, player);
     });
 
-    ws.on('USER_JOINED', (playerData) => {
-      console.log(playerData)
-      const player = new Player(this);
-      player.create(playerData);
-      this.players.set(playerData.id, player);
-    });
-
-
-    ws.on('USER_LEAVED', ({ id }) => {
-      console.log('player leaved', id);
-      this.playersToDestroy.push(id);
-    })
-
-
-    ws.on('WORLD_UPDATE', this.updateWorldObjects);
+    /* Create UI */
     this.fpsCounter = new DebugLabel(this, 0, 0);
     this.worldLabels = new DebugLabel(this, 0, 15);
     this.btnGroup = new ButtonGroup({
@@ -85,39 +65,64 @@ class GameScene extends Phaser.Scene {
     this.btnGroup.addButton('add box', () => {
       ws.emit('DEBUG_BOX_ADD');
     });
+
     this.btnGroup.addButton('add 10 boxes', () => {
       for (let i = 0; i < 10; i++) {
         ws.emit('DEBUG_BOX_ADD');
       }
     });
+
     this.btnGroup.addButton('add 100 boxes', () => {
       for (let i = 0; i < 100; i++) {
         ws.emit('DEBUG_BOX_ADD');
       }
     });
+
     this.btnGroup.addButton('drop friction/angular f', () => {
       ws.emit('DEBUG_BOX_FORCE');
     });
+
+    /* Bind events */
+    ws.on('WORLD_UPDATE', this.updateWorldObjects);
+    /* Waiting when player will be added to the game */
+    ws.on('ADD_ME_SUCCESS', (playerData) => {
+      this.createUser(playerData);
+    });
+
+    /* Emit initialize event */
+    ws.emit('ADD_ME');
   }
 
+  /* Update exists object or creates new */
   updateWorldObjects = (data) => {
     const { gameObjects } = this;
-    const { players } = data;
+    const { 
+      players,
+      objects,
+      bullets,
+      rayBullets,
+    } = data;
 
     /* update players */
-    if (this.player.isJoined && players.length > 0) {
+    if (this.player && this.player.isJoined && players.length > 0) {
       players.map((playerData) => {
         // Is it me?
         if (playerData.id === this.player.id) {
           this.player.updateData(playerData);
         } else {
           const player = this.players.get(playerData.id);
-          player.updateData(playerData);
+          if (player) {
+            player.updateData(playerData);
+          } else {
+            const newPlayer = new Player(this);
+            newPlayer.create(playerData);
+            this.players.set(playerData.id, newPlayer);
+          }
         }
       });
     }
 
-    data.objects.forEach((obj) => {
+    objects.forEach((obj) => {
       const gameObject = gameObjects.get(obj.id);
       if (!gameObject) {
         const gameObj = new Box(this);
@@ -128,12 +133,28 @@ class GameScene extends Phaser.Scene {
       }
     });
 
-    const stopDate = +(new Date());
-    // console.log('updates per sec', Math.floor(1000 / ( stopDate - this.lastUpdateTime)));
-    this.lastUpdateTime = stopDate;
+    bullets.forEach((bulletData) => {
+      const bullet = gameObjects.get(bulletData.id);
+      if (bullet) {
+        bullet.updateData(bulletData)
+      } else {
+        gameObjects.set(bulletData.id, new Bullet(this, bulletData ));
+      }
+    });
+
+    rayBullets.forEach((data) => {
+      const ray = gameObjects.get(data.id);
+      if (ray) {
+        ray.updateData(data);
+      } else {
+        const newRay = new Bullet(this, data);
+        // newRay.create(data);
+        gameObjects.set(data.id, newRay);
+      }
+    })
   }
 
-
+  /* Redraw all object by its properties */
   update(time) {
     this.fpsCounter.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
     this.worldLabels.setText([
@@ -145,27 +166,15 @@ class GameScene extends Phaser.Scene {
       'world y: ' + Math.round(this.input.mousePointer.worldY),
     ]);
 
-    this.boundsGraphics.clear();
-    this.boundsGraphics.strokeRectShape(this.boundsRect);
-
-    if (this.player.isJoined) {
+    if (this.player && this.player.isJoined) {
       this.player.update(time);
     }
 
     this.gameObjects.forEach(obj => obj.update());
-
+    this.bullets.forEach(obj => obj.update());
     this.players.forEach((pl) => {
       pl.updateOther(time);
     });
-
-    if (this.playersToDestroy.length > 0) {
-      this.playersToDestroy.map((id) => {
-        const player = this.players.get(id);
-        player.destroy();
-        this.players.delete(id);
-      })
-      this.playersToDestroy = []; 
-    }
   }
 }
 

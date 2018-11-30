@@ -21,10 +21,10 @@ class Core {
   handleMessages() {
     const { sm } = this;
     sm.on('GET_WORLD_INFO', (data, socket) => {
-      socket.emit('message', {
+      sm.sendTo(socket, {
         type: 'WORLD_INFO',
         data: this.world.collectWorldInfo(socket),
-      })
+      });
     });
 
     sm.on('ADD_ME', (data, socket) => {
@@ -34,6 +34,10 @@ class Core {
     sm.on('UPDATE_ME', this.world.updatePlayer);
     sm.on('WANT_TO_SHOT', (data, socket) => {
       this.world.playerShoot(socket);
+    });
+
+    sm.on('WANT_TO_SHOT_RAY', (data, socket) => {
+      this.world.playerShootRay(socket);
     });
   }
 }
