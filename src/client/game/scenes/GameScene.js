@@ -5,8 +5,7 @@ import Player from '../objects/Player';
 import ws from '../ws';
 import Box from '../objects/Box';
 import Bullet from '../objects/Bullet';
-import Line from '../objects/Line';
-
+import { Messages, UserMessages, DebugMessages } from '../../../common/dictionary';
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -18,6 +17,7 @@ class GameScene extends Phaser.Scene {
 
     this.players = new Map();
     this.bullets = new Map();
+    this.bulletsToRemove = [];
     this.gameObjects = new Map(); 
   }
 
@@ -29,10 +29,22 @@ class GameScene extends Phaser.Scene {
     Bullet.preload(this);
   }
 
-  createUser(playerData) {
-    this.player = new Player(this);
-    this.player.create(playerData);
-    this.cameras.main.startFollow(this.player.graphics);
+  createPlayer(data) {
+    console.log(data)
+    const player = new Player(this);
+    player.create(data);
+    if (data.isActivePlayer) {
+      this.cameras.main.startFollow(player.graphics);
+    }
+    this.players.set(data.id, player);
+  }
+
+  removePlayer({ id }) {
+    const player = this.players.get(id);
+    if (player) {
+      player.destroy();
+    }
+    this.players.delete(id);
   }
 
   create(data) {
@@ -62,35 +74,31 @@ class GameScene extends Phaser.Scene {
       title: 'controls',
     });
 
-    this.btnGroup.addButton('add box', () => {
-      ws.emit('DEBUG_BOX_ADD');
-    });
-
+    this.btnGroup.addButton('add box', () =>  ws.emit(DebugMessages.DEBUG_BOX_ADD));
     this.btnGroup.addButton('add 10 boxes', () => {
       for (let i = 0; i < 10; i++) {
-        ws.emit('DEBUG_BOX_ADD');
+        ws.emit(DebugMessages.DEBUG_BOX_ADD)
       }
     });
 
-    this.btnGroup.addButton('add 100 boxes', () => {
-      for (let i = 0; i < 100; i++) {
-        ws.emit('DEBUG_BOX_ADD');
+    this.btnGroup.addButton('add 25 boxes', () => {
+      for (let i = 0; i < 25; i++) {
+        ws.emit(DebugMessages.DEBUG_BOX_ADD)
       }
     });
 
     this.btnGroup.addButton('drop friction/angular f', () => {
-      ws.emit('DEBUG_BOX_FORCE');
+      ws.emit(DebugMessages.DEBUG_BOX_FORCE);
     });
 
     /* Bind events */
-    ws.on('WORLD_UPDATE', this.updateWorldObjects);
+    ws.on(Messages.WORLD_UPDATE, this.updateWorldObjects);
     /* Waiting when player will be added to the game */
-    ws.on('ADD_ME_SUCCESS', (playerData) => {
-      this.createUser(playerData);
-    });
+    ws.on(Messages.PLAYER_JOINED, data => this.createPlayer(data));
+    ws.on(Messages.PLAYER_LEFT, data => this.removePlayer(data));
 
     /* Emit initialize event */
-    ws.emit('ADD_ME');
+    ws.emit(UserMessages.WANT_JOIN);
   }
 
   /* Update exists object or creates new */
@@ -100,27 +108,22 @@ class GameScene extends Phaser.Scene {
       players,
       objects,
       bullets,
-      rayBullets,
+      bulletsToRemove,
     } = data;
+    this.bulletsToRemove = this.bulletsToRemove.concat(bulletsToRemove);
 
     /* update players */
-    if (this.player && this.player.isJoined && players.length > 0) {
-      players.map((playerData) => {
-        // Is it me?
-        if (playerData.id === this.player.id) {
-          this.player.updateData(playerData);
-        } else {
-          const player = this.players.get(playerData.id);
-          if (player) {
-            player.updateData(playerData);
-          } else {
-            const newPlayer = new Player(this);
-            newPlayer.create(playerData);
-            this.players.set(playerData.id, newPlayer);
-          }
+    players.map((playerData) => {
+      // Is it me?
+      if (playerData.isActivePlayer) {
+        this.player.updateData(playerData);
+      } else {
+        const player = this.players.get(playerData.id);
+        if (player) {
+          player.updateData(playerData);
         }
-      });
-    }
+      }
+    });
 
     objects.forEach((obj) => {
       const gameObject = gameObjects.get(obj.id);
@@ -133,16 +136,7 @@ class GameScene extends Phaser.Scene {
       }
     });
 
-    bullets.forEach((bulletData) => {
-      const bullet = gameObjects.get(bulletData.id);
-      if (bullet) {
-        bullet.updateData(bulletData)
-      } else {
-        gameObjects.set(bulletData.id, new Bullet(this, bulletData ));
-      }
-    });
-
-    rayBullets.forEach((data) => {
+    bullets.forEach((data) => {
       const ray = gameObjects.get(data.id);
       if (ray) {
         ray.updateData(data);
@@ -173,8 +167,21 @@ class GameScene extends Phaser.Scene {
     this.gameObjects.forEach(obj => obj.update());
     this.bullets.forEach(obj => obj.update());
     this.players.forEach((pl) => {
-      pl.updateOther(time);
+      if (pl.isActivePlayer) {
+        pl.update(time)
+      } else {
+        pl.updateOther(time);
+      }
     });
+
+    this.bulletsToRemove.forEach(id => {
+      const bullet = this.gameObjects.get(id);
+      if (bullet) {
+        bullet.destory();
+        this.gameObjects.delete(id);
+      }
+    })
+    this.bulletsToRemove = [];
   }
 }
 

@@ -44,9 +44,9 @@ class SocketManager {
     socket.send(msgpack.encode(msg));
   }
 
-  broadcast(type, data) {
+  broadcast(type, data, exclude) {
     this.wss.clients.forEach((client)=> {
-      if (client !== this.wss && client.readyState === WebSocket.OPEN) {
+      if (client !== this.wss && client !== exclude && client.readyState === WebSocket.OPEN) {
         if (type instanceof Function === true) {
           type(client)
         } else {

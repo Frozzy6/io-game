@@ -2,10 +2,15 @@ class Box {
   constructor(parent) {
     this.parent = parent;
     this.size = 80;
+    this.position = {
+      x: 0,
+      y: 0,
+    };
   }
 
   static preload(scene) {
-    scene.load.image('woodenBox', '/img/game/box.png');
+    scene.load.image('woodenBox', '/img/game/box3.png');
+    // scene.load.image('woodenBox2', '/img/game/box2.jpg');
   }
 
   create(data) {
@@ -18,7 +23,8 @@ class Box {
   }
 
   updateData(data) {
-    this.position = data.position;
+    this.position.x = data.x;
+    this.position.y = data.y;
     this.angle = data.angle;
   }
 

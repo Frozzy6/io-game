@@ -1,4 +1,5 @@
 import World from "./world/World";
+import { UserMessages } from '../common/dictionary';
 
 class Core {
   constructor(socketManager) {
@@ -27,11 +28,11 @@ class Core {
       });
     });
 
-    sm.on('ADD_ME', (data, socket) => {
+    sm.on(UserMessages.WANT_JOIN, (data, socket) => {
       this.world.addPlayer(socket);
     });
 
-    sm.on('UPDATE_ME', this.world.updatePlayer);
+    sm.on(UserMessages.INPUT, this.world.updatePlayer);
     sm.on('WANT_TO_SHOT', (data, socket) => {
       this.world.playerShoot(socket);
     });

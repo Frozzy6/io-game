@@ -1,9 +1,9 @@
-import uuid from 'uuid';
 import Matter from 'matter-js/src/module/main.js';
+import getID from '../../../common/ids';
 
 class PhysicsObject {
   constructor({body, mass, primitive, friction = 0.3}) {
-    this.id = uuid.v4();
+    this.id = getID();
     this.body = body;
     this.body.gameObject = this;
     this.body.mass = mass;
@@ -11,8 +11,6 @@ class PhysicsObject {
     this.body.friction = friction;
     this.body.frictionStatic = friction;
     this.body.frictionAir = friction;
-    //TODO: remove and impliment later
-    this.primitive = primitive;
   }
 
   appendTo(world) {
@@ -22,14 +20,10 @@ class PhysicsObject {
   toMessage() {
     return {
       id: this.id,
-      position: {
-        x: Math.floor(this.body.position.x),
-        y: Math.floor(this.body.position.y),
-      },
-      velocity: {
-        x: Math.floor(this.body.velocity.x),
-        y: Math.floor(this.body.velocity.y),
-      },
+      x: Math.floor(this.body.position.x),
+      y: Math.floor(this.body.position.y),
+      vx: Math.floor(this.body.velocity.x),
+      vy: Math.floor(this.body.velocity.y),
       angle: parseFloat(this.body.angle.toFixed(2)),
     }
   }

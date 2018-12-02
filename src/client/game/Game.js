@@ -15,7 +15,8 @@ class Game {
       autoResize: true,
       parent: "entry",
       scene: [
-        BootScene, GameScene
+        BootScene,
+        GameScene,
       ]
     };
 

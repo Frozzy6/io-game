@@ -3,8 +3,10 @@ import Matter, {
   Engine,
   Query,
   Composite,
+  Vector,
 } from 'matter-js/src/module/main.js';
-import uuid from 'uuid';
+import getID from '../../common/ids';
+import { Messages, DebugMessages } from '../../common/dictionary';
 import Box from './objects/Box';
 import Player from './objects/Player';
 import Bullet from './objects/Bullet';
@@ -25,8 +27,7 @@ class World {
     this.players = new Map();
     this.worldState = {
       objects: [],
-      bullets: [],
-      rayBullets: new Map(),
+      bullets: new Map(),
     }
     
     this.generate();
@@ -41,9 +42,9 @@ class World {
     /* DEBUG ONLY MESSAGES */
     setInterval(() => {
       this.sendDebugMessage();
-    }, 200);
+    }, 500);
 
-    this.sm.on('DEBUG_BOX_FORCE', () => {
+    this.sm.on(DebugMessages.DEBUG_BOX_FORCE, () => {
       this.worldState.objects.forEach(({ body }) => {
         body.slop = 0.05;
         body.friction = 0.0001;
@@ -53,7 +54,7 @@ class World {
       });
     });
 
-    this.sm.on('DEBUG_BOX_ADD', () => {
+    this.sm.on(DebugMessages.DEBUG_BOX_ADD, () => {
       const x = Math.round(Math.random() * this.WORLD_WIDTH);
       const y = Math.round(Math.random() * this.WORLD_HEIGHT);
       this.addGameObject(x, y);
@@ -114,10 +115,12 @@ class World {
       return false;
     }
     //TODO: change to up/down/left/right
-    const { directions, angle } = data;
+    const { move, angle, shotStart } = data;
+    player.shotStart = shotStart;
+
     const force = {
-      x: directions[0],
-      y: directions[1],
+      x: (move.left ? -1 : (move.right ? 1 : 0)),
+      y: (move.up ? -1 : (move.down ? 1 : 0)),
     };
 
     // normalize
@@ -152,8 +155,9 @@ class World {
     Matter.World.addBody(this.physicsEngine.world, player.body);
     this.players.set(socket, player);
 
+    this.sm.broadcast(Messages.PLAYER_JOINED, player.toMessage(), socket);
     this.sm.sendTo(socket, {
-      type: 'ADD_ME_SUCCESS',
+      type: Messages.PLAYER_JOINED,
       data: player.toPersonalMessage(),
     });
 
@@ -170,7 +174,7 @@ class World {
     Matter.World.remove(this.physicsEngine.world, player.body);
     this.players.delete(socket);
 
-    this.sm.broadcast('USER_LEAVED', { id: player.id });
+    this.sm.broadcast(Messages.PLAYER_LEFT, { id: player.id });
   }
 
   playerShoot = (socket) => {
@@ -197,7 +201,7 @@ class World {
 
   playerShootRay = (socket) => {
     const player = this.players.get(socket);
-    const { rayBullets } = this.worldState;
+    const { bullets } = this.worldState;
     const { 
       angle,
       position: {
@@ -207,8 +211,8 @@ class World {
     } = player.body;
     const length = 50;
     
-    const id = uuid.v4();
-    rayBullets.set(id, {
+    const id = getID();
+    bullets.set(id, {
       id,
       own: player.id,
       angle,
@@ -225,25 +229,29 @@ class World {
 
   update(delta) {
     const { physicsEngine } = this;
-
+    const { timestamp } = physicsEngine.timing;
+    /* Update physics */
     this.updatesPerSec++;
     this.tickCounter++;
-    Events.trigger(physicsEngine, 'tick', { timestamp: physicsEngine.timing.timestamp });
+    Events.trigger(physicsEngine, 'tick', { timestamp });
     Engine.update(physicsEngine, 1000 / 60);
-    Events.trigger(physicsEngine, 'afterTick', { timestamp: physicsEngine.timing.timestamp });
+    Events.trigger(physicsEngine, 'afterTick', { timestamp });
 
+    /* Process shooting */
     const players = [];
-    const playersIter = this.players.entries();
-    for (let [key, p] of playersIter) {
-      players.push(p.toMessage());
-    }
+    this.players.forEach((player) => {
+      if (player.shotStart && timestamp > player.lastShootTime + player.fireGap) {
+        this.playerShootRay(player.socket);
+        player.lastShootTime = timestamp;
+      }
+      players.push(player.toMessage());
+    });
 
     const bodies = Composite.allBodies(physicsEngine.world);
 
-    const { rayBullets } = this.worldState;
-
-    rayBullets.forEach((ray) => {
-      const rayWidth = 1;
+    const { bullets } = this.worldState;
+    const bulletsToRemove = [];
+    bullets.forEach((ray) => {
       if (ray.stop) {
         return;
       }
@@ -251,54 +259,59 @@ class World {
         Query ray create new rectangle object with from between points
         with "rayWidth" width and check collisions between new rect and objects
        */
-      const collisions = Query.ray(bodies, ray.from, ray.to);
+      const collisions = Query.ray(bodies, ray.from, ray.to).filter(c => c.body);
+      
+      if (collisions.length === 0) {
+        return;
+      } 
+      let withClosestObject = null;
+      /* Detect closest object to player was hitted */
+      if (collisions.length > 1) {
 
-      if (collisions.length > 0) {
-        const fcol = collisions[0];
-        // ray.move = fcol.normal;
-        ray.stop = true;
-        for (let i = 0; i <= 2; i++ ) {
-          const stepX = (ray.to.x - ray.from.x) / 2 * i;
-          const stepY = (ray.to.y - ray.from.y) / 2 * i;
-          var r = Query.point([fcol.body], {
-            x: ray.from.x + stepX,
-            y: ray.from.y + stepY,
-          });
-          // console.log(r);
-          if (r.length > 0) {
-            ray.point = {
-              x: ray.from.x + stepX,
-              y: ray.from.y + stepY,
-            }
-            ray.position = ray.point;
-            break;
-          }
-        }
-
-        if (!ray.point) {
-          ray.point = {
-            x: ray.from.x + (ray.to.x - ray.from.x) / 2,
-            y: ray.from.y + (ray.to.y - ray.from.y) / 2,
-          }
-          ray.position = ray.point;
-        }
-        const v = Matter.Vector.normalise({
-          x: ray.to.x - ray.from.x,
-          y: ray.to.y - ray.from.y,
-        });
-        console.log(v);
-        Matter.Body.applyForce(collisions[0].body, {
-            x: ray.point.x,
-            y: ray.point.y,
-          }, {
-            x: v.x * 0.1,
-            y: v.y * 0.1,
-          });
-
+      } else {
+        withClosestObject = collisions[0];
       }
+
+      const fcol = collisions[0];
+      ray.stop = true;
+      // for (let i = 0; i <= 1; i++ ) {
+      //   const stepX = (ray.to.x - ray.from.x) / 1 * i;
+      //   const stepY = (ray.to.y - ray.from.y) / 1 * i;
+      //   var r = Query.point([fcol.body], {
+      //     x: ray.from.x + stepX,
+      //     y: ray.from.y + stepY,
+      //   });
+      //   // console.log(r);
+      //   if (r.length > 0) {
+      //     ray.point = {
+      //       x: ray.from.x + stepX,
+      //       y: ray.from.y + stepY,
+      //     }
+      //     ray.position = ray.point;
+      //     break;
+      //   }
+      // }
+
+      ray.position = {
+        x: ray.from.x + (ray.to.x - ray.from.x) / 2,
+        y: ray.from.y + (ray.to.y - ray.from.y) / 2,
+      }
+      const v = Matter.Vector.normalise({
+        x: ray.to.x - ray.from.x,
+        y: ray.to.y - ray.from.y,
+      });
+      Matter.Body.applyForce(fcol.body, {
+          x: ray.position.x,
+          y: ray.position.y,
+        }, {
+          x: v.x * 0.1,
+          y: v.y * 0.1,
+        });
+      bulletsToRemove.push(ray.id);
+      bullets.delete(ray.id);
     });
 
-    rayBullets.forEach((ray) => {
+    bullets.forEach((ray) => {
       if (ray.stop) {
         return;
       }
@@ -314,17 +327,25 @@ class World {
       }
     });
 
-    this.sm.broadcast('WORLD_UPDATE', {
+    this.sm.broadcast(Messages.WORLD_UPDATE, {
       /* Players state */
       players,
       /* Game Object */
       objects: this.worldState.objects.map(o => o.toMessage()),
       newObjects: [],
       /* Bullets */
-      bullets: this.worldState.bullets.map(o => o.toMessage()),
-      newBullets: [],
-      rayBullets: Array.from(rayBullets).reduce((acc, item) => (acc.push(item[1]), acc), []),
+      bullets: Array.from(bullets).reduce((acc, item) => (acc.push(item[1]), acc), []),
+      bulletsToRemove,
     });
+    /*
+      Thoughts about world update message
+      it should be like: 
+      1. array of items to remove
+      2. array with information of objects update
+      3. array players update
+      4. array of new bullets
+      5. etc
+    */
   }
 
   sendDebugMessage(delta) {

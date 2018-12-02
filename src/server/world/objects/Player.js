@@ -15,19 +15,30 @@ class Player extends PhysicsObject {
     this.body.frictionAir = 0.3;
     this.size = size;
     this.isAlive = true;
+    this.shotStart = true;
+    this.fireGap = 200;
+    this.lastShootTime = 0;
+  }
+
+  shot(timestamp) {
+    this.lastShootTime = timestamp;
   }
 
   toMessage() {
     return {
       ...super.toMessage(),
       size: this.size,
+      isActivePlayer: false
     }
   }
 
-  toPersonalMessage = () => ({
-    ...this.toMessage(),
-    private: true
-  })
+  toPersonalMessage() {
+    return {
+      ...super.toMessage(),
+      size: this.size,
+      isActivePlayer: true
+    }
+  }
 }
 
 export default Player;

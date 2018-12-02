@@ -2,15 +2,12 @@ import { defaults } from 'lodash';
 import Matter from 'matter-js/src/module/main.js';
 
 import PhysicsObject from './PhysicsObject';
-import { Primitives, Textures } from '../../../common/dictionary';
 
 const defaultParams = {
   width: 10,
   height: 20,
   startVelocity: 1.75,
   mass: 5,
-  primitive: Primitives.RECT,
-  texture: Textures.BULLET,
   friction: 0.05,
 }
 

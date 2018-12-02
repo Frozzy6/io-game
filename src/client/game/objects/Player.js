@@ -1,4 +1,5 @@
 import ws from '../ws';
+import { UserMessages } from '../../../common/dictionary';
 
 const getAngleBetween = (a, b, c, d) => Phaser.Math.Angle.Between(a, b, c, d);
 
@@ -10,23 +11,33 @@ class Player {
     this.movementGap = 50;
     this.velocity = { x: 0, y: 0 };
 
+    this.shootStart = false;
+    this.shootHold = false;
+    this.reload = false;
     // Weapon
     this.lastFireTime = 0;
-    this.fireGap = 50; 
+    this.fireGap = 200;
   }
 
   static preload(scene) {
     scene.load.image('whiteSmoke', '/img/particles/white-smoke.png');
     scene.load.atlas('flares', '/img/bullets/flares.png', '/img/bullets/flares.json');
-    scene.load.spritesheet('player', '/img/game/user/player.png', {frameWidth: 262, frameHeight: 157});
-    scene.load.spritesheet('player_move', '/img/game/user/player_move.png', { frameWidth: 259, frameHeight: 180 });
+    // scene.load.spritesheet('player', '/img/game/user/player.png', {frameWidth: 262, frameHeight: 157});
+    // scene.load.spritesheet('player_move', '/img/game/user/player_move.png', { frameWidth: 259, frameHeight: 180 });
+    scene.load.image('fire', '/img/bullets/fire.png');
+    scene.load.image('pl', '/img/game/user/pl.png');
+    scene.load.image('hand', '/img/game/user/hand.png');
+    scene.load.image('pistol', '/img/game/user/pistol.png');
   }
 
   create(data) {
     const addKey = key => this.parent.input.keyboard.addKey(key);
     this.isJoined = true;
     this.id = data.id;
-    this.position = data.position;
+    this.position = {
+      x: data.x,
+      y: data.y,
+    };
     this.angle = data.angle;
     this.size = data.size;
     this.speed = 5;
@@ -34,24 +45,25 @@ class Player {
     this.graphics.setDepth(3);
     this.debugGraphics = this.parent.add.graphics({ lineStyle: { width: 2, color: 0xbbbb00 }, fillStyle: { color: 0xbbbb00 } });;
     this.debugCircle = new Phaser.Geom.Circle(0, 0, this.size);
+    this.isActivePlayer = data.isActivePlayer;
 
-    this.parent.anims.create({ 
-      key: 'idle',
-      frames: this.parent.anims.generateFrameNames('player'), 
-      repeat: -1,
-      frameRate: 11
-    });
+    this.instance = this.parent.add.sprite(0, 0, 'pl');
+    // this.instance.setDisplaySize(this.size * 3.8, this.instance.height / this.instance.width * this.size * 3.8);
+    this.instance.setOrigin(0.5,0.5);
 
-    this.parent.anims.create({
-      key: 'move',
-      frames: this.parent.anims.generateFrameNames('player_move'),
-      repeat: -1,
-      frameRate: 11
-    });
+    /* for weapon */
+    this.leftHand = this.parent.add.sprite(25, 12, 'hand');
+    this.rightHand = this.parent.add.sprite(25, -12, 'hand');
+    this.weapon = this.parent.add.sprite(35, 0, 'pistol');
+    this.weapon.rotation = 1.5;
+    // this.leftHand = this.parent.add.sprite(25, 20, 'hand');
+    // this.rightHand = this.parent.add.sprite(25, -20, 'hand');
+    this.graphics.add(this.debugGraphics);
+    this.graphics.add(this.leftHand);
+    this.graphics.add(this.rightHand);
+    this.graphics.add(this.weapon);
+    this.graphics.add(this.instance);
 
-    this.instance = this.parent.add.sprite(0, 0, 'player').play('move');
-    this.instance.setDisplaySize(this.size * 3.8, this.instance.height / this.instance.width * this.size * 3.8);
-    this.instance.setOrigin(0.25,0.5);
     //dummy weapon
     this.weapon = {
       name: 'machine gun',
@@ -116,18 +128,7 @@ class Player {
     //   }
     // });
 
-    this.graphics.add(this.debugGraphics);
-    this.graphics.add(this.instance);
 
-    this.flares = this.parent.add.particles('flares').createEmitter({
-      x: 1600,
-      y: 200,
-      angle: { min: 0, max: 360 },
-      scale: { start: 0.4, end: 0.2 },
-      blendMode: 'SCREEN',
-      lifespan: 500,
-      on: false
-    });
 
     this.whiteSmoke = this.parent.add.particles('whiteSmoke').createEmitter({
       x: 0,
@@ -168,10 +169,10 @@ class Player {
   }
 
   updateData(data) {
-    this.position.x = data.position.x;
-    this.position.y = data.position.y;
-    this.velocity.x = data.velocity.x;
-    this.velocity.y = data.velocity.y;
+    this.position.x = data.x;
+    this.position.y = data.y;
+    this.velocity.x = data.vx;
+    this.velocity.y = data.vy;
     this.angle = data.angle;
   }
 
@@ -186,7 +187,7 @@ class Player {
     this.debugGraphics.clear();
     this.debugGraphics.fillCircleShape(this.debugCircle);
 
-    const { worldX, worldY, x: mouseX, y: mouseY } = this.parent.game.input.mousePointer;
+    const { x: mouseX, y: mouseY } = this.parent.game.input.mousePointer;
     const { scrollX: camScrollX, scrollY: camScrollY } = this.parent.cameras.main;
   
     // Keys state 
@@ -198,26 +199,26 @@ class Player {
       lbMouseDown,
     } = this.controls;
 
+    // if (lbMouseDown && time > this.lastFireTime + this.fireGap) {
+    //   ws.emit('WANT_TO_SHOT_RAY');
+    //   this.lastFireTime = time;
+    //   this.weapon.lastFired = time;
+    // }
+
+    
+    this.shootStart = lbMouseDown;
+
     if (time > this.lastUpdateMovement + this.movementGap) {
-      const directions = [0, 0];
-      // // Horizontal movement
-      if (keyA.isDown) {
-        directions[0] = -1;
-      } else if (keyD.isDown) {
-        directions[0] = 1;
-      }
-
-      // Vertical movement
-      if (keyW.isDown) {
-        directions[1] = -1;
-      } else if (keyS.isDown) {
-        directions[1] = 1;
-      }
-
       this.lastUpdateMovement = time;
-      ws.emit('UPDATE_ME', {
-        directions,
+      ws.emit(UserMessages.INPUT, {
+        move: {
+          up: keyW.isDown,
+          down: keyS.isDown,
+          left: keyA.isDown,
+          right: keyD.isDown,
+        },
         angle: this.graphics.rotation,
+        shotStart: this.shootStart,
       });
     }
 
@@ -230,19 +231,6 @@ class Player {
       this.graphics.rotation = Phaser.Math.Angle.RotateTo(this.graphics.rotation, this.nextAngle, 0.3)
     }
 
-    if (lbMouseDown && time > this.lastFireTime + this.fireGap) {
-      ws.emit('WANT_TO_SHOT_RAY');
-      this.lastFireTime = time;
-      this.weapon.lastFired = time;
-    }
-
-
-
-    if (Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1) {
-      this.instance.play('move', true);
-    } else {
-      this.instance.play('idle', true);
-    }
     /* Debug line to cursor */
     // this.debugGraphics.lineStyle(2, 0x000);
     // this.debugGraphics.beginPath();
@@ -269,9 +257,9 @@ class Player {
     //   }
     // }
 
-    // this.flares.setPosition(this.position.x, this.position.y);
+    
     // this.flares.setSpeed(500)
-    // this.flares.emitParticle(1);
+    
 
   }
 
