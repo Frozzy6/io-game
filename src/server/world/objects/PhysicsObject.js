@@ -20,10 +20,10 @@ class PhysicsObject {
   toMessage() {
     return {
       id: this.id,
-      x: Math.floor(this.body.position.x),
-      y: Math.floor(this.body.position.y),
-      vx: Math.floor(this.body.velocity.x),
-      vy: Math.floor(this.body.velocity.y),
+      x: +this.body.position.x.toFixed(2),
+      y: +this.body.position.y.toFixed(2),
+      vx: +this.body.velocity.x.toFixed(2),
+      vy: +this.body.velocity.y.toFixed(2),
       angle: parseFloat(this.body.angle.toFixed(2)),
     }
   }

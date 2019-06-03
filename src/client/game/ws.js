@@ -8,14 +8,12 @@ class WS {
   constructor(){
     this.sendedCount = 0;
     this.recievedCount = 0;
-    
+    this.lag = 500;
     this.socket = new WebSocket('ws://localhost:3000/');
     this.socket.binaryType = 'arraybuffer';
 
     this.listeners = [];
-    // this.socket.on('reconnect_attempt', (err) => {
-    //   console.log(err);
-    // })
+
 
     this.socket.onopen = () => {
       this.isReady = true;
@@ -23,14 +21,17 @@ class WS {
 
     // debug counter
     this.socket.onmessage = (event) => {
-      this.recievedCount++;
-      const msg = msgpack.decode(new Uint8Array(event.data));
-      console.log('decoded', msg);
-      this.listeners.forEach(({messageType, callback}) => {
-        if (msg.type === messageType) {
-          callback(msg.data);
-        }
-      })
+      const process = () => {
+        this.recievedCount++;
+        const msg = msgpack.decode(new Uint8Array(event.data));
+        // console.log('decoded', msg);
+        this.listeners.forEach(({messageType, callback}) => {
+          if (msg.type === messageType) {
+            callback(msg.data);
+          }
+        })
+      };
+      setTimeout(process, this.lag);
     };
 
     setInterval(()=>{
@@ -42,11 +43,15 @@ class WS {
   }
 
   emit(type, data) {
-    this.sendedCount++;
-    this.socket.send(msgpack.encode({
-      type,
-      data
-    }))
+    const process = () => {
+      this.sendedCount++;
+      this.socket.send(msgpack.encode({
+        type,
+        data
+      }))
+    };
+
+    setTimeout(process, this.lag);
   }
 
   on(messageType, callback) {
@@ -62,6 +67,11 @@ class WS {
     //     callback(msg.data);
     //   }
     // };
+  }
+
+  setLag(lag) {
+    this.lag = lag;
+    console.log(`Now log is ${this.lag}`);
   }
 }
 

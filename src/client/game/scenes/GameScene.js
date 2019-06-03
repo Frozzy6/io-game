@@ -34,7 +34,7 @@ class GameScene extends Phaser.Scene {
     const player = new Player(this);
     player.create(data);
     if (data.isActivePlayer) {
-      this.cameras.main.startFollow(player.graphics);
+      this.cameras.main.startFollow(player.physicsContainer);
     }
     this.players.set(data.id, player);
   }
@@ -63,7 +63,7 @@ class GameScene extends Phaser.Scene {
       player.create(playerData);
       this.players.set(playerData.id, player);
     });
-
+    this.matter.world.update30Hz();
     /* Create UI */
     this.fpsCounter = new DebugLabel(this, 0, 0);
     this.worldLabels = new DebugLabel(this, 0, 15);
@@ -101,6 +101,9 @@ class GameScene extends Phaser.Scene {
     ws.emit(UserMessages.WANT_JOIN);
   }
 
+  processWorldUpdate = (data) => {
+
+  }
   /* Update exists object or creates new */
   updateWorldObjects = (data) => {
     const { gameObjects } = this;
@@ -115,16 +118,31 @@ class GameScene extends Phaser.Scene {
     /* update players */
     players.map((playerData) => {
       // Is it me?
+      // console.log(playerData);
+      //TODO: bug! isActivePlayer always false
       if (playerData.isActivePlayer) {
-        this.player.updateData(playerData);
+        // this.player.updateData(playerData);
       } else {
         const player = this.players.get(playerData.id);
-        if (player) {
-          player.updateData(playerData);
+        if (!player) {
+          return;
         }
+        let j = 0;
+        while (j < player.pendingInputs.length) {
+          const input = player.pendingInputs[j];
+          if (input.inputSequenceNumber <= playerData.lastProcessedInput) {
+            player.pendingInputs.splice(j, 1);
+          } else {
+            j++;
+            console.log('apply');
+          }
+        }
+        console.log(player.inputSequenceNumber, playerData.lastProcessedInput)
+        /* update player by recieved data */
+        player.updateData(playerData);
       }
     });
-
+    
     objects.forEach((obj) => {
       const gameObject = gameObjects.get(obj.id);
       if (!gameObject) {
@@ -159,13 +177,13 @@ class GameScene extends Phaser.Scene {
       'world x: ' + Math.round(this.input.mousePointer.worldX),
       'world y: ' + Math.round(this.input.mousePointer.worldY),
     ]);
-
+    // this.player.processUserInputs();
     if (this.player && this.player.isJoined) {
       this.player.update(time);
     }
 
-    this.gameObjects.forEach(obj => obj.update());
-    this.bullets.forEach(obj => obj.update());
+    // this.gameObjects.forEach(obj => obj.update());
+    // this.bullets.forEach(obj => obj.update());
     this.players.forEach((pl) => {
       if (pl.isActivePlayer) {
         pl.update(time)
@@ -174,14 +192,14 @@ class GameScene extends Phaser.Scene {
       }
     });
 
-    this.bulletsToRemove.forEach(id => {
-      const bullet = this.gameObjects.get(id);
-      if (bullet) {
-        bullet.destory();
-        this.gameObjects.delete(id);
-      }
-    })
-    this.bulletsToRemove = [];
+    // this.bulletsToRemove.forEach(id => {
+    //   const bullet = this.gameObjects.get(id);
+    //   if (bullet) {
+    //     bullet.destory();
+    //     this.gameObjects.delete(id);
+    //   }
+    // })
+    // this.bulletsToRemove = [];
   }
 }
 

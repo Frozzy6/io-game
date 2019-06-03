@@ -48,7 +48,7 @@ document.getElementById('entry').append(p);
 ws.on('DEBUG', ({ bodies, world }) => {
   canvas.width = world.WORLD_WIDTH;
   canvas.height = world.WORLD_HEIGHT;
-  p.textContent = '?';
+  p.textContent = 'server state';
   context.fillStyle = '#fff';
   context.fillRect(0, 0, canvas.width, canvas.height);
 

@@ -8,22 +8,30 @@ class Player {
     this.parent = parent;
     this.isJoined = false;
     this.lastUpdateMovement = -1;
-    this.movementGap = 50;
-    this.velocity = { x: 0, y: 0 };
 
+    /* last timestamp of pricessed input */
+    this.lastUpdateTS = 0;
+    /* collection of user input for creating prediction */
+    this.pendingInputs = [];
+    this.movementGap = 50;
+    /* TODO: need to recieve this param from server */
+    this.movementSpeed = 0.8;
+    /* data for reconciliation */
+    this.inputSequenceNumber = 0;
+    this.velocity = { x: 0, y: 0 };
+    this.position = { x: 0, y: 0 };
     this.shootStart = false;
     this.shootHold = false;
     this.reload = false;
     // Weapon
     this.lastFireTime = 0;
     this.fireGap = 200;
+    this.locked = false;
   }
 
   static preload(scene) {
     scene.load.image('whiteSmoke', '/img/particles/white-smoke.png');
     scene.load.atlas('flares', '/img/bullets/flares.png', '/img/bullets/flares.json');
-    // scene.load.spritesheet('player', '/img/game/user/player.png', {frameWidth: 262, frameHeight: 157});
-    // scene.load.spritesheet('player_move', '/img/game/user/player_move.png', { frameWidth: 259, frameHeight: 180 });
     scene.load.image('fire', '/img/bullets/fire.png');
     scene.load.image('pl', '/img/game/user/pl.png');
     scene.load.image('hand', '/img/game/user/hand.png');
@@ -41,10 +49,6 @@ class Player {
     this.angle = data.angle;
     this.size = data.size;
     this.speed = 5;
-    this.graphics = this.parent.add.container(this.position.x, this.position.y);
-    this.graphics.setDepth(3);
-    this.debugGraphics = this.parent.add.graphics({ lineStyle: { width: 2, color: 0xbbbb00 }, fillStyle: { color: 0xbbbb00 } });;
-    this.debugCircle = new Phaser.Geom.Circle(0, 0, this.size);
     this.isActivePlayer = data.isActivePlayer;
 
     this.instance = this.parent.add.sprite(0, 0, 'pl');
@@ -52,38 +56,50 @@ class Player {
     this.instance.setOrigin(0.5,0.5);
 
     /* for weapon */
-    this.leftHand = this.parent.add.sprite(25, 12, 'hand');
-    this.rightHand = this.parent.add.sprite(25, -12, 'hand');
-    this.weapon = this.parent.add.sprite(35, 0, 'pistol');
+    this.leftHand = this.parent.add.image(23, 6, 'hand');
+    this.rightHand = this.parent.add.image(23, -6, 'hand');
+    this.weapon = this.parent.add.image(35, 0, 'pistol');
     this.weapon.rotation = 1.5;
+
+    this.graphics = this.parent.add.container(this.position.x, this.position.y);
+
+
+    // this.physicsContainer = this.parent.matter.add.image(this.position.x, this.position.y, 'pl');
+    // console.log(this.graphics.rotation);
+    this.graphics.setDepth(3);
+
     // this.leftHand = this.parent.add.sprite(25, 20, 'hand');
     // this.rightHand = this.parent.add.sprite(25, -20, 'hand');
-    this.graphics.add(this.debugGraphics);
+    // this.graphics.add(this.debugGraphics);
     this.graphics.add(this.leftHand);
     this.graphics.add(this.rightHand);
     this.graphics.add(this.weapon);
+    this.graphics.setSize(50,50);
     this.graphics.add(this.instance);
-
+    
+    this.physicsContainer = this.parent.matter.add.gameObject(this.graphics);
+    this.physicsContainer.setFrictionAir(0.3);
+    this.physicsContainer.setMass(15);
     //dummy weapon
-    this.weapon = {
-      name: 'machine gun',
-      bullet: {
-        sprite: 'bullet',
-        size: { w: 15, h: 5 },
-        velocity: {
-          min: 10,
-          max: 20
-        },
-        lifetime: 1000,
-      },
-      delay: { 
-        min: 50, 
-        max: 100,
-        nextDelay: 0,
-      },
-      lastFired: 0,
-      damage: 10,
-    };
+    // this.weapon = {
+    //   name: 'machine gun',
+    //   bullet: {
+    //     sprite: 'bullet',
+    //     size: { w: 15, h: 5 },
+    //     velocity: {
+    //       min: 10,
+    //       max: 20
+    //     },
+    //     lifetime: 1000,
+    //   },
+    //   delay: { 
+    //     min: 50, 
+    //     max: 100,
+    //     nextDelay: 0,
+    //   },
+    //   lastFired: 0,
+    //   damage: 10,
+    // };
 
     // Controls
     const { 
@@ -110,26 +126,6 @@ class Player {
     });
     
 
-    // this.parent.input.on('pointerdown', this.createBullet);
-    // for (var i = 0; i < frames.length; i++) {
-    //   var x = Phaser.Math.Between(0, 800);
-    //   var y = Phaser.Math.Between(0, 600);
-    //   console.log(frames);
-    //   this.parent.add.image(x, y, 'round', frames[i]);
-    // }
-    // this.game.input.on('pointermove', (pointer) => {
-    //   console.log('locked', this.game.input.mouse.locked);
-    //   if (this.game.input.mouse.locked) {
-    //     console.log(pointer);
-    //     this.cross.setPosition(
-    //       this.cross.x + pointer.movementX,
-    //       this.cross.y + pointer.movementY,
-    //     )
-    //   }
-    // });
-
-
-
     this.whiteSmoke = this.parent.add.particles('whiteSmoke').createEmitter({
       x: 0,
       y: 0,
@@ -139,6 +135,9 @@ class Player {
       lifespan: 800,
       on: false
     });
+
+    this.fireGap = 50;
+    this.lastShootingtime = 0;
   }
 
   createBullet = (time) => {
@@ -174,22 +173,23 @@ class Player {
     this.velocity.x = data.vx;
     this.velocity.y = data.vy;
     this.angle = data.angle;
+
+    this.physicsContainer.setPosition(this.position.x, this.position.y);
+    this.physicsContainer.setVelocity(this.velocity.x, this.velocity.y);
   }
 
   updateOther() {
     if (this.graphics.rotation !== this.angle) {
       this.graphics.rotation = Phaser.Math.Angle.RotateTo(this.graphics.rotation, this.angle, 0.2)
     }
-    this.graphics.setPosition(this.position.x, this.position.y);
+    // this.graphics.setPosition(this.position.x, this.position.y);
   }
 
   update(time) {
-    this.debugGraphics.clear();
-    this.debugGraphics.fillCircleShape(this.debugCircle);
-
+    // this.physicsContainer.setPosition(this.position.x, this.position.y);
+    // this.physicsContainer.setVelocity(this.velocity.x, this.velocity.y);
     const { x: mouseX, y: mouseY } = this.parent.game.input.mousePointer;
     const { scrollX: camScrollX, scrollY: camScrollY } = this.parent.cameras.main;
-  
     // Keys state 
     const {
       keyW,
@@ -199,36 +199,61 @@ class Player {
       lbMouseDown,
     } = this.controls;
 
-    // if (lbMouseDown && time > this.lastFireTime + this.fireGap) {
-    //   ws.emit('WANT_TO_SHOT_RAY');
+    this.shootStart = lbMouseDown;
+    // if (lbMouseDown && time > this.fireGap + this.lastFireTime && !this.locked) {
+    //   this.locked = true;
+    //   this.parent.tweens.add({
+    //     targets: this.weapon,
+    //     x: 30,
+    //     duration: this.fireGap * 2,
+    //     yoyo: true,
+    //     onComplete: () => { this.locked = false; },
+    //   });
+    //   this.parent.tweens.add({
+    //     targets: [this.rightHand, this.leftHand],
+    //     x: 21,
+    //     duration: this.fireGap * 2,
+    //     yoyo: true,
+    //     delay: 10,
+    //   });
+
     //   this.lastFireTime = time;
-    //   this.weapon.lastFired = time;
     // }
 
-    
-    this.shootStart = lbMouseDown;
-
     if (time > this.lastUpdateMovement + this.movementGap) {
+      /* Update timestamp */
+      const currentTS = +new Date();
+      const lastUpdateTS = this.lastUpdateTS || currentTS;
+      const deltaSec = (currentTS - lastUpdateTS) / 1000;
+      this.lastUpdateTS = currentTS;
       this.lastUpdateMovement = time;
-      ws.emit(UserMessages.INPUT, {
+
+      const message = {
         move: {
           up: keyW.isDown,
           down: keyS.isDown,
           left: keyA.isDown,
           right: keyD.isDown,
         },
-        angle: this.graphics.rotation,
+        // angle: this.graphics.rotation,
+        angle: 0,
         shotStart: this.shootStart,
-      });
+        /* for server validation */
+        press_time: deltaSec,
+        inputSequenceNumber: this.inputSequenceNumber++,
+      };
+
+      this.pendingInputs.push(message);
+      ws.emit(UserMessages.INPUT, message);
     }
 
-    this.graphics.x = this.position.x;
-    this.graphics.y = this.position.y;
+    // this.graphics.x = this.position.x;
+    // this.graphics.y = this.position.y;
 
-    this.nextAngle = getAngleBetween(this.position.x, this.position.y, mouseX + camScrollX, mouseY + camScrollY);
+    this.nextAngle = getAngleBetween(this.graphics.x, this.graphics.y, mouseX + camScrollX, mouseY + camScrollY);
 
     if (this.nextAngle !== this.angle) {
-      this.graphics.rotation = Phaser.Math.Angle.RotateTo(this.graphics.rotation, this.nextAngle, 0.3)
+      this.graphics.setRotation(Phaser.Math.Angle.RotateTo(this.graphics.rotation, this.nextAngle, 0.3))
     }
 
     /* Debug line to cursor */
@@ -259,8 +284,6 @@ class Player {
 
     
     // this.flares.setSpeed(500)
-    
-
   }
 
 

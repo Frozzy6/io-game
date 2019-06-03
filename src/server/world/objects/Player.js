@@ -18,6 +18,9 @@ class Player extends PhysicsObject {
     this.shotStart = true;
     this.fireGap = 200;
     this.lastShootTime = 0;
+
+    /* for client reconciliation */
+    this.lastProcessedInput = 0;
   }
 
   shot(timestamp) {
@@ -28,7 +31,10 @@ class Player extends PhysicsObject {
     return {
       ...super.toMessage(),
       size: this.size,
-      isActivePlayer: false
+      isActivePlayer: false,
+      frictionAir: this.body.frictionAir,
+      // TODO: make as personal message
+      lastProcessedInput: this.lastProcessedInput,
     }
   }
 
@@ -36,7 +42,8 @@ class Player extends PhysicsObject {
     return {
       ...super.toMessage(),
       size: this.size,
-      isActivePlayer: true
+      isActivePlayer: true,
+      lastProcessedInput: this.lastProcessedInput,
     }
   }
 }

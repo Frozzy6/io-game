@@ -14,6 +14,16 @@ class Game {
       height: window.innerHeight,
       autoResize: true,
       parent: "entry",
+      physics: {
+        default: 'matter',
+        matter: {
+          debug: true,
+          gravity: {
+            x: 0,
+            y: 0
+          },
+        }
+      },
       scene: [
         BootScene,
         GameScene,

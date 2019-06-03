@@ -42,7 +42,7 @@ class World {
     /* DEBUG ONLY MESSAGES */
     setInterval(() => {
       this.sendDebugMessage();
-    }, 500);
+    }, 100);
 
     this.sm.on(DebugMessages.DEBUG_BOX_FORCE, () => {
       this.worldState.objects.forEach(({ body }) => {
@@ -114,8 +114,8 @@ class World {
     if (!player) {
       return false;
     }
-    //TODO: change to up/down/left/right
-    const { move, angle, shotStart } = data;
+    const { move, angle, shotStart, inputSequenceNumber } = data;
+    player.lastProcessedInput = inputSequenceNumber;
     player.shotStart = shotStart;
 
     const force = {
