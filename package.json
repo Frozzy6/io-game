@@ -14,7 +14,7 @@
     "@babel/runtime": "^7.1.5",
     "express": "^4.16.4",
     "http": "0.0.0",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.19",
     "matter-js": "^0.14.2",
     "morgan": "^1.9.1",
     "notepack": "0.0.2",
